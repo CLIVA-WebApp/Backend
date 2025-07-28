@@ -1,18 +1,28 @@
-# CLIVA Health Planning Platform Backend
+# CLIVA Health Planning Platform
 
-Backend API untuk platform perencanaan kesehatan CLIVA - TIC 2025
+## 🎯 Tentang CLIVA
 
-## Tech Stack
+**CLIVA** (Community-based Local Infrastructure Visualization and Analysis) adalah platform web untuk perencanaan kesehatan berbasis GIS yang membantu perencana kesehatan daerah mengatasi kesenjangan distribusi layanan kesehatan di Indonesia.
 
-- **Framework**: FastAPI (Python)
-- **Database**: PostgreSQL via Supabase
+Platform ini dirancang untuk memberikan solusi komprehensif dalam analisis dan perencanaan distribusi fasilitas kesehatan, dengan fokus pada:
+
+- **Visualisasi Peta Akses Kesehatan** - Heatmaps yang menunjukkan area dengan akses terbatas
+- **Algoritma Prioritas Kecamatan** - Scoring system untuk menentukan prioritas pembangunan Puskesmas
+- **Simulator "What-If"** - Simulasi dampak pembangunan Puskesmas baru
+- **Manajemen Data Terpusat** - CRUD untuk data Puskesmas dan populasi
+
+## 🏗️ Arsitektur Teknis
+
+### Tech Stack
+- **Backend Framework**: FastAPI (Python)
+- **Database**: PostgreSQL via Supabase (Cloud Database)
 - **Architecture**: MVCS (Model-View-Controller-Service)
-- **Authentication**: JWT
+- **Authentication**: JWT (JSON Web Tokens)
 - **ORM**: SQLAlchemy
-- **Migrations**: Alembic
+- **Database Migrations**: Alembic
+- **API Documentation**: Auto-generated dengan FastAPI
 
-## Struktur Direktori
-
+### Struktur Direktori
 ```
 Backend/
 ├── src/
@@ -32,148 +42,221 @@ Backend/
 └── README.md           # This file
 ```
 
-## Fitur Utama
+## 🚀 Fitur Utama
 
-- **Health Access Heatmaps** - Visualisasi peta akses kesehatan
-- **Equity Prioritization Score** - Algoritma prioritas kecamatan
-- **"What-If" Simulator** - Simulasi Puskesmas virtual
-- **Data Management** - CRUD untuk data Puskesmas & populasi
+### 1. Health Access Heatmaps
+Visualisasi peta yang menunjukkan:
+- Area dengan akses kesehatan terbatas
+- Radius coverage setiap Puskesmas
+- Kepadatan populasi per kecamatan
+- Indikator kemiskinan dan kebutuhan
 
-## Roadmap Implementasi
+### 2. Equity Prioritization Score
+Algoritma scoring yang mempertimbangkan:
+- Jarak ke Puskesmas terdekat
+- Kepadatan populasi
+- Tingkat kemiskinan
+- Luas wilayah
+- Akses transportasi
 
-### Phase 1: Setup & Foundation (Week 1)
-1. **Environment Setup**
-   - Install dependencies: `pip install -r requirements.txt`
-   - Setup virtual environment
-   - Configure `.env` file dengan Supabase credentials
+### 3. "What-If" Simulator
+Simulasi dampak pembangunan Puskesmas baru:
+- Analisis coverage area
+- Perhitungan aksesibilitas
+- Estimasi dampak pada populasi
+- Rekomendasi lokasi optimal
 
-2. **Database Setup**
-   - Setup Supabase project
-   - Configure database connection
-   - Run initial migrations dengan Alembic
+### 4. Data Management
+Sistem manajemen data terpusat untuk:
+- Data Puskesmas (lokasi, kapasitas, coverage)
+- Data populasi per kecamatan
+- Indikator sosial-ekonomi
+- Historical data tracking
 
-3. **Basic Authentication**
-   - Implement user registration/login
-   - JWT token generation/validation
-   - Password hashing dengan bcrypt
+## 📊 Model Data
 
-### Phase 2: Core Features (Week 2)
-1. **Git Repository Management**
-   - Upload repository files
-   - Clone repositories from Git URLs
-   - Repository validation
+### User (Perencana Kesehatan)
+- Informasi profil perencana
+- Role dan permissions
+- Authentication credentials
+- Activity tracking
 
-2. **Merge Conflict Detection**
-   - Parse Git merge conflicts
-   - Extract conflict markers
-   - Store conflict data
+### Puskesmas (Fasilitas Kesehatan)
+- Nama dan kode Puskesmas
+- Lokasi (latitude, longitude)
+- Kapasitas dan radius coverage
+- Status aktif/nonaktif
+- Data administratif (kecamatan, kabupaten, provinsi)
 
-3. **Conflict Resolution Interface**
-   - API endpoints untuk conflict data
-   - Conflict visualization
-   - Resolution tracking
+### Population (Data Populasi)
+- Jumlah penduduk per kecamatan
+- Luas wilayah dan kepadatan
+- Tingkat kemiskinan
+- Koordinat pusat kecamatan
+- Tahun data
 
-### Phase 3: Advanced Features (Week 3)
-1. **Conflict Resolution Engine**
-   - Automatic conflict resolution suggestions
-   - Manual resolution interface
-   - Conflict resolution history
+## 🔌 API Endpoints
 
-2. **Real-time Features**
-   - WebSocket untuk real-time updates
-   - Collaborative conflict resolution
-   - Live conflict status
+### Authentication
+- `POST /auth/register` - Registrasi perencana kesehatan
+- `POST /auth/login` - Login ke sistem
+- `POST /auth/logout` - Logout dari sistem
 
-3. **Security & Validation**
-   - Input validation
-   - File upload security
-   - Rate limiting
+### Puskesmas Management
+- `GET /puskesmas/` - Daftar semua Puskesmas
+- `POST /puskesmas/` - Tambah Puskesmas baru
+- `GET /puskesmas/{id}` - Detail Puskesmas
+- `PUT /puskesmas/{id}` - Update data Puskesmas
+- `DELETE /puskesmas/{id}` - Hapus Puskesmas
 
-### Phase 4: Testing & Deployment (Week 4)
-1. **Testing**
-   - Unit tests untuk semua modules
-   - Integration tests
-   - API endpoint testing
+### Population Management
+- `GET /populations/` - Daftar data populasi
+- `POST /populations/` - Tambah data populasi
+- `GET /populations/{id}` - Detail data populasi
+- `PUT /populations/{id}` - Update data populasi
+- `DELETE /populations/{id}` - Hapus data populasi
 
-2. **Documentation**
-   - API documentation dengan FastAPI docs
-   - Code documentation
-   - Deployment guide
+### Health Check
+- `GET /` - Root endpoint
+- `GET /health` - Status API
 
-3. **Deployment**
-   - Docker containerization
-   - Production environment setup
-   - CI/CD pipeline
+## 📅 Roadmap Implementasi
 
-## Quick Start
+### ✅ Day 1: Foundation & Authentication (SELESAI)
+- Setup Supabase database
+- Create User model untuk perencana kesehatan
+- Implement authentication (register/login)
+- Create basic API endpoints
+- Setup CORS untuk frontend
 
-1. **Setup virtual environment**
-   ```bash
-   cd Backend
-   python -m venv venv
-   # On Windows:
-   venv\Scripts\activate
-   # On Linux/Mac:
-   source venv/bin/activate
-   ```
+### ✅ Day 2: Data Models & CRUD (SELESAI)
+- Create Puskesmas model
+- Create Population model
+- Implement CRUD operations
+- Add data validation dengan Pydantic
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 🔄 Day 3: Health Access Heatmaps (DALAM PROSES)
+- Implement geospatial calculations
+- Create distance calculation API
+- Add radius coverage logic
+- Create heatmap data endpoint
 
-3. **Setup Supabase project**
-   - Buat project di [Supabase](https://supabase.com)
-   - Dapatkan database credentials dari Settings > Database
-   - Copy connection string
+### 📋 Day 4: Equity Prioritization Score (PLANNED)
+- Implement scoring algorithm
+- Create priority calculation API
+- Add multiple factor calculations
+- Create ranking system
 
-4. **Setup environment variables**
-   ```bash
-   cp env.example .env
-   # Edit .env dengan Supabase credentials Anda
-   ```
+### 🎯 Day 5: "What-If" Simulator & Polishing (PLANNED)
+- Implement simulation logic
+- Create virtual Puskesmas API
+- Add impact calculation
+- Create simulation results endpoint
 
-5. **Initialize Alembic (first time only)**
-   ```bash
-   alembic init alembic  # Skip if already done
-   alembic revision --autogenerate -m "Initial migration"
-   alembic upgrade head
-   ```
+## 🎯 Manfaat Platform
 
-6. **Start development server**
-   ```bash
-   # Option 1: Using start script
-   python start.py
-   
-   # Option 2: Using uvicorn directly
-   uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-   ```
+### Untuk Perencana Kesehatan
+- **Data-Driven Decision Making**: Keputusan berbasis data yang akurat
+- **Visualisasi Komprehensif**: Peta interaktif untuk analisis
+- **Simulasi Dampak**: Prediksi hasil sebelum implementasi
+- **Prioritasi Efektif**: Algoritma untuk menentukan prioritas
 
-7. **Access the application**
-   - API: http://localhost:8000
-   - Health Check: http://localhost:8000/health
-   - API Documentation: http://localhost:8000/docs
+### Untuk Masyarakat
+- **Akses Kesehatan Merata**: Distribusi fasilitas yang optimal
+- **Transparansi Perencanaan**: Data terbuka untuk publik
+- **Efisiensi Sumber Daya**: Penggunaan anggaran yang efektif
+- **Peningkatan Kualitas Hidup**: Akses kesehatan yang lebih baik
 
-## API Endpoints
+### Untuk Pemerintah Daerah
+- **Evidence-Based Policy**: Kebijakan berbasis bukti
+- **Resource Optimization**: Optimasi penggunaan sumber daya
+- **Monitoring & Evaluation**: Sistem monitoring yang terintegrasi
+- **Stakeholder Collaboration**: Kolaborasi antar pemangku kepentingan
 
-- `GET /` - Health check
-- `GET /health` - API status
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login
-- `POST /auth/logout` - User logout
+## 🔧 Quick Start untuk Development
 
-## Development Guidelines
+### 1. Setup Environment
+```bash
+cd Backend
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
+```
 
-1. **Code Style**: Use Black for formatting, isort for imports
-2. **Type Hints**: Always use type hints
-3. **Documentation**: Docstrings for all functions
-4. **Testing**: Write tests for new features
-5. **Git Flow**: Feature branches, PR reviews
+### 2. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
 
-## Next Steps
+### 3. Setup Supabase
+- Buat project di [Supabase](https://supabase.com)
+- Dapatkan database credentials dari Settings > Database
+- Copy connection string
 
-1. Setup Supabase project dan dapatkan credentials
-2. Configure database connection
-3. Implement basic authentication
-4. Create first API endpoints
-5. Setup testing framework
+### 4. Configure Environment
+```bash
+cp env.example .env
+# Edit .env dengan Supabase credentials Anda
+```
+
+### 5. Run Database Migrations
+```bash
+alembic upgrade head
+```
+
+### 6. Start Development Server
+```bash
+python start.py
+```
+
+### 7. Access Application
+- API: http://localhost:8000
+- Health Check: http://localhost:8000/health
+- API Documentation: http://localhost:8000/docs
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+python run_tests.py
+
+# Run specific test file
+pytest tests/test_auth.py -v
+
+# Run with coverage
+pytest --cov=src --cov-report=html
+```
+
+## 🛠️ Development Commands
+
+```bash
+
+python run.py install    # Install dependencies
+python run.py setup      # Setup environment
+python run.py test       # Run tests
+python run.py run        # Start server
+python run.py migrate    # Run migrations
+
+```
+
+## 🤝 Kontribusi
+
+Kami mengundang kontribusi dari:
+- **Perencana Kesehatan**: Feedback dan kebutuhan fungsional
+- **Developer**: Pengembangan fitur dan perbaikan bug
+- **Data Scientist**: Optimasi algoritma dan analisis
+- **UI/UX Designer**: Peningkatan user experience
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 📞 Kontak
+
+Untuk pertanyaan atau kolaborasi, silakan hubungi tim pengembang CLIVA.
+
+---
+
+**CLIVA - Empowering Health Planning Through Data-Driven Decisions**
