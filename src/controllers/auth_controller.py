@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi.responses import RedirectResponse
 from src.config.settings import settings
 from src.services.auth_service import AuthService
-from src.models.user import User, UserProvider, UserSchema
+from src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
 from src.middleware.auth_middleware import get_current_user_required
 from src.utils.exceptions import AuthenticationException
 from src.schemas.auth_schema import (
@@ -86,6 +86,104 @@ class AuthController:
         """Logout user by clearing session cookie"""
         response.delete_cookie("access_token")
         return {"message": "Successfully logged out"}
+    
+    async def register_user(self, user_data: UserRegister, response: Response) -> dict:
+        """Register a new user with email/password"""
+        try:
+            user, jwt_token = await self.auth_service.register_user(user_data)
+            
+            # Set HTTP-only cookie with the JWT token
+            response.set_cookie(
+                key="access_token",
+                value=jwt_token,
+                httponly=True,
+                secure=False,  # Set to True in production with HTTPS
+                samesite="lax",
+                max_age=self.auth_service.token_expire_minutes * 60
+            )
+            
+            return {
+                "message": "Registration successful",
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "username": user.username,
+                    "is_active": user.is_active
+                }
+            }
+        
+        except AuthenticationException as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Registration failed: {str(e)}"
+            )
+    
+    async def login_user(self, login_data: UserLogin, response: Response) -> dict:
+        """Login user with email/password"""
+        try:
+            user, jwt_token = await self.auth_service.login_user(login_data)
+            
+            # Set HTTP-only cookie with the JWT token
+            response.set_cookie(
+                key="access_token",
+                value=jwt_token,
+                httponly=True,
+                secure=False,  # Set to True in production with HTTPS
+                samesite="lax",
+                max_age=self.auth_service.token_expire_minutes * 60
+            )
+            
+            return {
+                "message": "Login successful",
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "username": user.username,
+                    "is_active": user.is_active
+                }
+            }
+        
+        except AuthenticationException as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(e)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Login failed: {str(e)}"
+            )
+    
+    async def change_password(
+        self, 
+        password_data: PasswordChange,
+        current_user: UserSchema = Depends(get_current_user_required)
+    ) -> dict:
+        """Change user password"""
+        try:
+            success = await self.auth_service.change_password(
+                current_user.id,
+                password_data.current_password,
+                password_data.new_password
+            )
+            
+            return {"message": "Password changed successfully"}
+        
+        except AuthenticationException as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Password change failed: {str(e)}"
+            )
     
     async def get_current_user_profile(
         self, 

@@ -1,10 +1,7 @@
-from fastapi import HTTPException, Depends, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import HTTPException, Depends, status, Cookie
 from typing import Optional
 from src.services.auth_service import AuthService
-from src.models.user import User
-
-security = HTTPBearer()
+from src.schemas.user_schema import UserSchema
 
 class AuthMiddleware:
     def __init__(self):
@@ -12,36 +9,32 @@ class AuthMiddleware:
     
     async def get_current_user_optional(
         self, 
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
-    ) -> Optional[User]:
-        """Get current user from token, return None if not authenticated"""
-        if not credentials:
+        access_token: str = Cookie(None)
+    ) -> Optional[UserSchema]:
+        """Get current user from cookie token, return None if not authenticated"""
+        if not access_token:
             return None
             
-        token = credentials.credentials
-        user = await self.auth_service.get_current_user(token)
+        user = await self.auth_service.get_current_user(access_token)
         return user
     
     async def get_current_user_required(
         self, 
-        credentials: HTTPAuthorizationCredentials = Depends(security)
-    ) -> User:
-        """Get current user from token, raise exception if not authenticated"""
-        if not credentials:
+        access_token: str = Cookie(None)
+    ) -> UserSchema:
+        """Get current user from cookie token, raise exception if not authenticated"""
+        if not access_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail="Authentication required"
             )
             
-        token = credentials.credentials
-        user = await self.auth_service.get_current_user(token)
+        user = await self.auth_service.get_current_user(access_token)
         
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail="Invalid authentication credentials"
             )
             
         if not user.is_active:
@@ -57,11 +50,11 @@ auth_middleware = AuthMiddleware()
 
 # Dependency functions
 async def get_current_user_optional(
-    user: Optional[User] = Depends(auth_middleware.get_current_user_optional)
-) -> Optional[User]:
+    user: Optional[UserSchema] = Depends(auth_middleware.get_current_user_optional)
+) -> Optional[UserSchema]:
     return user
 
 async def get_current_user_required(
-    user: User = Depends(auth_middleware.get_current_user_required)
-) -> User:
+    user: UserSchema = Depends(auth_middleware.get_current_user_required)
+) -> UserSchema:
     return user

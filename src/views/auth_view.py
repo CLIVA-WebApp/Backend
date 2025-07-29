@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from typing import Optional, Dict, Any
 from src.config.settings import settings
 from src.controllers.auth_controller import auth_controller
-from src.models.user import User, UserProvider
+from src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
 from src.middleware.auth_middleware import get_current_user_required
 from src.schemas.auth_schema import (
     GoogleAuthResponse, 
@@ -20,6 +20,7 @@ from src.utils.exceptions import AuthenticationException
 # Create router with prefix and tags
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+# OAuth endpoints
 @auth_router.get("/google", summary="Redirect to Google OAuth")
 async def redirect_to_google():
     """Redirect to Google OAuth - backend handles the entire flow"""
@@ -33,10 +34,28 @@ async def google_callback(
 ):
     """Handle OAuth callback and set session cookie"""
     result = await auth_controller.handle_google_callback(code, state)
-    
-    # Redirect to frontend with success message
     return result
 
+# Password authentication endpoints
+@auth_router.post("/register", summary="Register User")
+async def register_user(user_data: UserRegister, response: Response):
+    """Register a new user with email/password"""
+    return await auth_controller.register_user(user_data, response)
+
+@auth_router.post("/login", summary="Login User")
+async def login_user(login_data: UserLogin, response: Response):
+    """Login user with email/password"""
+    return await auth_controller.login_user(login_data, response)
+
+@auth_router.post("/change-password", summary="Change Password")
+async def change_password(
+    password_data: PasswordChange,
+    current_user: UserSchema = Depends(get_current_user_required)
+):
+    """Change user password"""
+    return await auth_controller.change_password(password_data, current_user)
+
+# Session management endpoints
 @auth_router.get("/session/verify", summary="Verify Session")
 async def verify_session(access_token: str = Cookie(None)):
     """Verify session and return user data"""
@@ -52,7 +71,7 @@ async def verify_session(access_token: str = Cookie(None)):
     description="Get current authenticated user profile information"
 )
 async def get_current_user_profile(
-    current_user: User = Depends(get_current_user_required)
+    current_user: UserSchema = Depends(get_current_user_required)
 ) -> UserResponse:
     return await auth_controller.get_current_user_profile(current_user)
 
