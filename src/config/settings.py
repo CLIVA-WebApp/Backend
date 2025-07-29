@@ -28,9 +28,11 @@ class Settings(BaseSettings):
     app_host: str = Field(..., alias="APP_HOST")
     app_port: int = Field(..., alias="APP_PORT")
     frontend_url: str = Field(..., alias="FRONTEND_URL")
+    backend_url: str = Field(..., alias="BACKEND_URL")
 
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # This will ignore extra fields
 
 settings = Settings()
