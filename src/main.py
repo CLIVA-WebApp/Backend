@@ -1,45 +1,85 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import uvicorn
 
-app = FastAPI(
-    title="CLIVA Health Planning Platform API",
-    description="Backend API untuk platform perencanaan kesehatan CLIVA - TIC 2025",
-    version="1.0.0"
+from src.config.settings import settings
+from src.views.auth_view import auth_router
+from src.utils.exceptions import (
+    AuthenticationException, 
+    DatabaseException, 
+    ValidationException, 
+    NotFoundException
 )
 
-# CORS middleware
+# Create FastAPI application
+app = FastAPI(
+    title="Google OAuth with Supabase API",
+    description="FastAPI application with Google OAuth authentication using Supabase",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[settings.frontend_url],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# Import routes
-from src.views.auth import router as auth_router
-from src.views.puskesmas import router as puskesmas_router
-
 # Include routers
-app.include_router(auth_router)
-app.include_router(puskesmas_router)
+app.include_router(auth_router, prefix="/api/v1")
 
+# Global exception handlers
+@app.exception_handler(AuthenticationException)
+async def authentication_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=401,
+        content={"detail": str(exc), "type": "authentication_error"}
+    )
+
+@app.exception_handler(DatabaseException)
+async def database_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Database operation failed", "type": "database_error"}
+    )
+
+@app.exception_handler(ValidationException)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc), "type": "validation_error"}
+    )
+
+@app.exception_handler(NotFoundException)
+async def not_found_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": str(exc), "type": "not_found_error"}
+    )
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "Google OAuth API"}
+
+# Root endpoint
 @app.get("/")
 async def root():
     return {
-        "message": "CLIVA Health Planning Platform API",
+        "message": "Google OAuth with Supabase API",
         "version": "1.0.0",
-        "description": "Platform perencanaan kesehatan berbasis GIS"
+        "docs": "/docs"
     }
 
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy", 
-        "service": "cliva-health-platform",
-        "features": [
-            "Health Access Heatmaps",
-            "Equity Prioritization Score", 
-            "What-If Simulator"
-        ]
-    } 
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host=settings.app_host,
+        port=settings.app_port,
+        reload=settings.app_env == "development"
+    )
