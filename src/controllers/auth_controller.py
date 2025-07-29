@@ -1,5 +1,8 @@
 from fastapi import HTTPException, status, Depends, Response
 from typing import Optional
+
+from fastapi.responses import RedirectResponse
+from src.config.settings import settings
 from src.services.auth_service import AuthService
 from src.models.user import User, UserProvider, UserSchema
 from src.middleware.auth_middleware import get_current_user_required
@@ -24,31 +27,24 @@ class AuthController:
                 detail=f"Failed to generate auth URL: {str(e)}"
             )
     
-    async def handle_google_callback(self, code: str, state: str = None, response: Response = None) -> dict:
+    async def handle_google_callback(self, code: str, state: str = None) -> dict:
         """Handle Google OAuth callback and set session cookie"""
         try:
             user, jwt_token = await self.auth_service.handle_oauth_callback(code, state)
             
+            response = RedirectResponse(url=f"{settings.frontend_url}/auth/success", status_code=302)
+
             # Set HTTP-only cookie with the JWT token
-            if response:
-                response.set_cookie(
-                    key="access_token",
-                    value=jwt_token,
-                    httponly=True,
-                    secure=False,  # Set to True in production with HTTPS
-                    samesite="lax",
-                    max_age=self.auth_service.token_expire_minutes * 60
-                )
+            response.set_cookie(
+                key="access_token",
+                value=jwt_token,
+                httponly=True,
+                secure=False,  # Set to True in production with HTTPS
+                samesite="lax",
+                max_age=self.auth_service.token_expire_minutes * 60
+            )
             
-            return {
-                "message": "Authentication successful",
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "username": user.username,
-                    "is_active": user.is_active
-                }
-            }
+            return response
         
         except AuthenticationException as e:
             raise HTTPException(

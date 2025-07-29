@@ -30,16 +30,12 @@ async def redirect_to_google():
 async def google_callback(
     code: str = Query(...), 
     state: str = Query(None),
-    response: Response = None
 ):
     """Handle OAuth callback and set session cookie"""
-    result = await auth_controller.handle_google_callback(code, state, response)
+    result = await auth_controller.handle_google_callback(code, state)
     
     # Redirect to frontend with success message
-    return RedirectResponse(
-        url=f"{settings.frontend_url}/auth/success",
-        status_code=302
-    )
+    return result
 
 @auth_router.get("/session/verify", summary="Verify Session")
 async def verify_session(access_token: str = Cookie(None)):

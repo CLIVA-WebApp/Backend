@@ -1,3 +1,4 @@
+import logging
 from supabase import create_client, Client
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -43,6 +44,8 @@ class AuthService:
             auth_response = self.supabase.auth.exchange_code_for_session({
                 "auth_code": code
             })
+
+            logging.info(f"Auth response: {auth_response}")
             
             if not auth_response.user:
                 raise AuthenticationException("No user data received from OAuth provider")
