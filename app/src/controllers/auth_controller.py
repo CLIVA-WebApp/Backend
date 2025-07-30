@@ -1,13 +1,12 @@
 from fastapi import HTTPException, status, Depends, Response
 from typing import Optional
-
 from fastapi.responses import RedirectResponse
-from src.config.settings import settings
-from src.services.auth_service import AuthService
-from src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
-from src.middleware.auth_middleware import get_current_user_required
-from src.utils.exceptions import AuthenticationException
-from src.schemas.auth_schema import (
+from app.src.config.settings import settings
+from app.src.services.auth_service import AuthService
+from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
+from app.src.middleware.auth_middleware import get_current_user_required
+from app.src.utils.exceptions import AuthenticationException
+from app.src.schemas.auth_schema import (
     GoogleAuthResponse,
     UserResponse
 )

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, Index
 from sqlalchemy.sql import func
-from src.config.database import Base
+from app.src.config.database import Base
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 from datetime import datetime

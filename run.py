@@ -29,8 +29,8 @@ def main():
         "test": ("python run_tests.py", "Running tests..."),
         "start": ("python start.py", "Starting development server..."),
         "migrate": ("alembic upgrade head", "Running database migrations..."),
-        "format": ("black src/ tests/", "Formatting code..."),
-        "lint": ("flake8 src/ tests/", "Running linter..."),
+        "format": ("black app/src/ app/tests/", "Formatting code..."),
+        "lint": ("flake8 app/src/ app/tests/", "Running linter..."),
         "clean": ("find . -name '*.pyc' -delete", "Cleaning cache...")
     }
     

@@ -6,17 +6,17 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Add the src directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add the app directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 # Load environment variables
 load_dotenv()
 
 # Import your models here
-from src.config.database import Base
-from src.models.user import User
-from src.models.puskesmas import Puskesmas
-from src.models.population import Population
+from app.src.config.database import Base
+from app.src.models.user import User
+from app.src.models.puskesmas import Puskesmas
+from app.src.models.population import Population
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

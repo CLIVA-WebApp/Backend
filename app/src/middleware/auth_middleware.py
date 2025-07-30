@@ -1,7 +1,7 @@
 from fastapi import HTTPException, Depends, status, Cookie
 from typing import Optional
-from src.services.auth_service import AuthService
-from src.schemas.user_schema import UserSchema
+from app.src.services.auth_service import AuthService
+from app.src.schemas.user_schema import UserSchema
 
 class AuthMiddleware:
     def __init__(self):

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Query, Response, Cookie, HTTPException, status
 from fastapi.responses import RedirectResponse
 from typing import Optional, Dict, Any
-from src.config.settings import settings
-from src.controllers.auth_controller import auth_controller
-from src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
-from src.middleware.auth_middleware import get_current_user_required
-from src.schemas.auth_schema import (
+from app.src.config.settings import settings
+from app.src.controllers.auth_controller import auth_controller
+from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
+from app.src.middleware.auth_middleware import get_current_user_required
+from app.src.schemas.auth_schema import (
     GoogleAuthResponse, 
     UserResponse
 )
@@ -13,9 +13,9 @@ from supabase import create_client, Client
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import secrets
-from src.services.auth_service import AuthService
-from src.services.user_service import UserService
-from src.utils.exceptions import AuthenticationException
+from app.src.services.auth_service import AuthService
+from app.src.services.user_service import UserService
+from app.src.utils.exceptions import AuthenticationException
 
 # Create router with prefix and tags
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])

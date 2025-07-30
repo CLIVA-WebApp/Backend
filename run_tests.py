@@ -13,10 +13,10 @@ def run_tests():
     # Run pytest with coverage
     result = subprocess.run([
         sys.executable, "-m", "pytest", 
-        "tests/", 
+        "app/tests/", 
         "-v", 
         "--tb=short",
-        "--cov=src",
+        "--cov=app/src",
         "--cov-report=term-missing",
         "--cov-report=html:htmlcov"
     ])
@@ -34,15 +34,15 @@ def run_linting():
     
     # Run black
     print("  - Running Black (code formatting)...")
-    subprocess.run([sys.executable, "-m", "black", "src/", "tests/", "--check"])
+    subprocess.run([sys.executable, "-m", "black", "app/src/", "app/tests/", "--check"])
     
     # Run isort
     print("  - Running isort (import sorting)...")
-    subprocess.run([sys.executable, "-m", "isort", "src/", "tests/", "--check-only"])
+    subprocess.run([sys.executable, "-m", "isort", "app/src/", "app/tests/", "--check-only"])
     
     # Run flake8
     print("  - Running flake8 (code quality)...")
-    subprocess.run([sys.executable, "-m", "flake8", "src/", "tests/"])
+    subprocess.run([sys.executable, "-m", "flake8", "app/src/", "app/tests/"])
 
 if __name__ == "__main__":
     print("🚀 Git Merge Conflict Resolver - Test Suite")

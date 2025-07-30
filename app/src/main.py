@@ -3,9 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 
-from src.config.settings import settings
-from src.views.auth_view import auth_router
-from src.utils.exceptions import (
+from app.src.config.settings import settings
+from app.src.views.auth_view import auth_router
+from app.src.utils.exceptions import (
     AuthenticationException, 
     DatabaseException, 
     ValidationException, 
@@ -78,7 +78,7 @@ async def root():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        "app.src.main:app",
         host=settings.app_host,
         port=settings.app_port,
         reload=settings.app_env == "development"

@@ -2,3 +2,6 @@
 I Woke Up*.pdf
 **pycache**
 .env
+
+raw_geodata/
+*.gdb.zip

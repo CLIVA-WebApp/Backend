@@ -4,12 +4,12 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import secrets
-from src.config.settings import settings
-from src.models.user import User, UserProvider
-from src.schemas.user_schema import UserSchema, UserRegister, UserLogin
-from src.services.user_service import UserService
-from src.utils.exceptions import AuthenticationException
-from src.utils.password import hash_password, verify_password, is_password_strong
+from app.src.config.settings import settings
+from app.src.models.user import User, UserProvider
+from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin
+from app.src.services.user_service import UserService
+from app.src.utils.exceptions import AuthenticationException
+from app.src.utils.password import hash_password, verify_password, is_password_strong
 
 class AuthService:
     def __init__(self):

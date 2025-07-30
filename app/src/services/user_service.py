@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Optional, Dict, Any
 from supabase import create_client, Client
-from src.config.settings import settings
-from src.schemas.user_schema import UserSchema, UserSchemaWithPassword
-from src.utils.exceptions import DatabaseException
+from app.src.config.settings import settings
+from app.src.schemas.user_schema import UserSchema, UserSchemaWithPassword
+from app.src.utils.exceptions import DatabaseException
 
 class UserService:
     def __init__(self):
