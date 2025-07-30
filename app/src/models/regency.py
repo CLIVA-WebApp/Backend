@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey
 from geoalchemy2 import Geometry
 from app.src.config.database import Base
 
@@ -14,4 +14,8 @@ class Regency(Base):
     
     province_id = Column(Integer, ForeignKey("provinces.id"), nullable=False)
     
-    geom = Column(Geometry('POLYGON', srid=4326), nullable=False)
+    # Area in square kilometers (calculated from geometry)
+    area_km2 = Column(Float, nullable=True)
+    
+    # Using MULTIPOLYGON for 2D geometries (Z dimension stripped)
+    geom = Column(Geometry('MULTIPOLYGON', srid=4326), nullable=False)

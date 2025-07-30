@@ -16,3 +16,6 @@ authlib
 itsdangerous
 geoalchemy2
 alembic
+geopandas
+fiona
+shapely
