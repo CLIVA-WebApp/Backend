@@ -15,8 +15,11 @@ load_dotenv()
 # Import your models here
 from app.src.config.database import Base
 from app.src.models.user import User
-from app.src.models.puskesmas import Puskesmas
-from app.src.models.population import Population
+from app.src.models.province import Province
+from app.src.models.regency import Regency
+from app.src.models.subdistrict import Subdistrict
+from app.src.models.population_point import PopulationPoint
+from app.src.models.health_facility import HealthFacility
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -44,7 +47,7 @@ def get_url():
     port = os.getenv("SUPABASE_PORT")
     dbname = os.getenv("SUPABASE_DBNAME")
     
-    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}?sslmode=require"
+    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}?sslmode=require&options=-csearch_path%3Dpublic,extensions"
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

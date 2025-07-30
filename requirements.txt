@@ -14,3 +14,5 @@ pydantic
 pydantic-settings
 authlib
 itsdangerous
+geoalchemy2
+alembic
