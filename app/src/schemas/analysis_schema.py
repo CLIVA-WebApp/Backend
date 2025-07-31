@@ -1,8 +1,9 @@
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Union
 from datetime import datetime
 from enum import Enum
 from decimal import Decimal
+from uuid import UUID
 
 # Heatmap Analysis Schemas
 class HeatmapPoint(BaseModel):
@@ -16,7 +17,7 @@ class HeatmapPoint(BaseModel):
         from_attributes = True
 
 class HeatmapData(BaseModel):
-    regency_id: str = Field(..., description="ID of the regency")
+    regency_id: UUID = Field(..., description="ID of the regency")
     regency_name: str = Field(..., description="Name of the regency")
     total_population: int = Field(..., description="Total population of the regency")
     population_outside_radius: int = Field(..., description="Population living outside service radius")
@@ -28,7 +29,7 @@ class HeatmapData(BaseModel):
 
 # Priority Score Analysis Schemas
 class SubDistrictScore(BaseModel):
-    sub_district_id: str = Field(..., description="ID of the sub-district")
+    sub_district_id: UUID = Field(..., description="ID of the sub-district")
     sub_district_name: str = Field(..., description="Name of the sub-district")
     gap_factor: float = Field(..., description="Gap factor score")
     efficiency_factor: float = Field(..., description="Efficiency factor score")
@@ -40,7 +41,7 @@ class SubDistrictScore(BaseModel):
         from_attributes = True
 
 class PriorityScoreData(BaseModel):
-    regency_id: str = Field(..., description="ID of the regency")
+    regency_id: UUID = Field(..., description="ID of the regency")
     regency_name: str = Field(..., description="Name of the regency")
     total_sub_districts: int = Field(..., description="Total number of sub-districts")
     sub_districts: List[SubDistrictScore] = Field(..., description="Ranked list of sub-districts")
@@ -50,9 +51,9 @@ class PriorityScoreData(BaseModel):
 
 # SubDistrict Details Schema
 class SubDistrictDetails(BaseModel):
-    sub_district_id: str = Field(..., description="ID of the sub-district")
+    sub_district_id: UUID = Field(..., description="ID of the sub-district")
     sub_district_name: str = Field(..., description="Name of the sub-district")
-    regency_id: str = Field(..., description="ID of the parent regency")
+    regency_id: UUID = Field(..., description="ID of the parent regency")
     regency_name: str = Field(..., description="Name of the parent regency")
     population: int = Field(..., description="Total population")
     area_km2: float = Field(..., description="Area in square kilometers")
@@ -71,7 +72,7 @@ class SubDistrictDetails(BaseModel):
 
 # Simulation Schemas
 class SimulationRequest(BaseModel):
-    regency_id: str = Field(..., description="ID of the regency for simulation")
+    regency_id: Union[UUID, str] = Field(..., description="ID of the regency for simulation (use 'mock' for testing)")
     budget: float = Field(..., gt=0, description="Available budget in currency units")
     facility_type: str = Field(..., description="Type of health facility to optimize")
     optimization_criteria: List[str] = Field(
@@ -88,7 +89,7 @@ class SimulationRequest(BaseModel):
 class OptimizedFacility(BaseModel):
     latitude: float = Field(..., description="Latitude coordinate of optimal location")
     longitude: float = Field(..., description="Longitude coordinate of optimal location")
-    sub_district_id: str = Field(..., description="ID of the sub-district")
+    sub_district_id: UUID = Field(..., description="ID of the sub-district")
     sub_district_name: str = Field(..., description="Name of the sub-district")
     estimated_cost: float = Field(..., description="Estimated cost for this facility")
     population_covered: int = Field(..., description="Population that would be covered")
@@ -98,7 +99,7 @@ class OptimizedFacility(BaseModel):
         from_attributes = True
 
 class SimulationResult(BaseModel):
-    regency_id: str = Field(..., description="ID of the regency")
+    regency_id: UUID = Field(..., description="ID of the regency")
     regency_name: str = Field(..., description="Name of the regency")
     total_budget: float = Field(..., description="Total budget allocated")
     budget_used: float = Field(..., description="Budget actually used")
@@ -118,7 +119,7 @@ class ReportExportRequest(BaseModel):
     
     @validator('report_type')
     def validate_report_type(cls, v):
-        valid_types = ["simulation_results", "priority_ranking", "heatmap_analysis", "subdistrict_details"]
+        valid_types = ["simulation_results", "priority_ranking", "heatmap_analysis"]
         if v not in valid_types:
             raise ValueError(f'Report type must be one of: {", ".join(valid_types)}')
         return v
@@ -127,7 +128,7 @@ class ReportExportRequest(BaseModel):
     def validate_format(cls, v):
         valid_formats = ["pdf", "csv"]
         if v not in valid_formats:
-            raise ValueError('Format must be either "pdf" or "csv"')
+            raise ValueError(f'Format must be one of: {", ".join(valid_formats)}')
         return v
 
 class ReportExportResponse(BaseModel):

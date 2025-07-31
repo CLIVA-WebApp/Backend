@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Optional
+from typing import Optional, Union
 from app.src.schemas.analysis_schema import (
     SimulationRequest,
     SimulationResult
@@ -8,6 +8,7 @@ from app.src.schemas.user_schema import UserSchema
 from app.src.middleware.auth_middleware import get_current_user_required
 from app.src.services.simulation_service import SimulationService
 from app.src.utils.exceptions import NotFoundException, ValidationException
+from uuid import UUID
 
 # Create router with prefix and tags
 simulation_router = APIRouter(prefix="/simulation", tags=["Simulation"])
@@ -45,12 +46,19 @@ async def run_simulation(
     
     Args:
         simulation_request: Contains regency_id, budget, facility_type, and optimization criteria
+        
+    For development testing, use regency_id="mock" in the request to get mock data.
     """
     try:
-        # Validate regency exists
-        regency = await simulation_service.get_regency_by_id(simulation_request.regency_id)
-        if not regency:
-            raise NotFoundException(f"Regency with ID {simulation_request.regency_id} not found")
+        # Handle mock request
+        if str(simulation_request.regency_id) == "mock":
+            # Convert mock string to UUID for the service
+            simulation_request.regency_id = UUID("550e8400-e29b-41d4-a716-446655440002")
+        else:
+            # Validate regency exists for real requests
+            regency = await simulation_service.get_regency_by_id(simulation_request.regency_id)
+            if not regency:
+                raise NotFoundException(f"Regency with ID {simulation_request.regency_id} not found")
         
         # Validate budget constraints
         if simulation_request.budget <= 0:

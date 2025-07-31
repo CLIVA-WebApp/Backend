@@ -8,11 +8,15 @@ from app.src.schemas.analysis_schema import (
 )
 from app.src.schemas.region_schema import RegencySchema, SubDistrictSchema, FacilitySchema
 from app.src.config.database import SessionLocal
+from app.src.models.regency import Regency
+from app.src.models.subdistrict import Subdistrict
+from app.src.models.health_facility import HealthFacility
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 import math
 import random
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -20,181 +24,199 @@ class AnalysisService:
     def __init__(self):
         self.db: Session = SessionLocal()
     
-    async def get_regency_by_id(self, regency_id: str) -> Optional[RegencySchema]:
+    async def get_regency_by_id(self, regency_id: UUID) -> Optional[RegencySchema]:
         """
         Get a specific regency by ID.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_regencies = {
-                "3201": RegencySchema(
-                    id="3201",
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_regency = RegencySchema(
+                    id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                     name="Kabupaten Bogor",
-                    code="3201",
-                    province_id="32",
-                    province_name="Jawa Barat"
-                ),
-                "3202": RegencySchema(
-                    id="3202",
-                    name="Kabupaten Sukabumi",
-                    code="3202",
-                    province_id="32",
-                    province_name="Jawa Barat"
+                    pum_code="3201",
+                    province_id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                    province_name="Jawa Barat",
+                    area_km2=2985.43
                 )
-            }
+                return mock_regency
             
-            regency = mock_regencies.get(regency_id)
+            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
+            
             if not regency:
                 logger.warning(f"Regency with ID {regency_id} not found")
                 return None
+            
+            regency_schema = RegencySchema(
+                id=regency.id,
+                name=regency.name,
+                pum_code=regency.pum_code,
+                province_id=regency.province_id,
+                province_name=regency.province.name if regency.province else None,
+                area_km2=regency.area_km2
+            )
                 
             logger.info(f"Retrieved regency: {regency.name}")
-            return regency
+            return regency_schema
             
         except Exception as e:
             logger.error(f"Error retrieving regency {regency_id}: {str(e)}")
             raise
     
-    async def get_subdistrict_by_id(self, subdistrict_id: str) -> Optional[SubDistrictSchema]:
+    async def get_subdistrict_by_id(self, subdistrict_id: UUID) -> Optional[SubDistrictSchema]:
         """
         Get a specific sub-district by ID.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_subdistricts = {
-                "320101": SubDistrictSchema(
-                    id="320101",
+            # Check if this is a mock request
+            if str(subdistrict_id) == "mock":
+                mock_subdistrict = SubDistrictSchema(
+                    id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                     name="Kecamatan Cibinong",
-                    code="320101",
-                    regency_id="3201",
-                    regency_name="Kabupaten Bogor"
-                ),
-                "320102": SubDistrictSchema(
-                    id="320102",
-                    name="Kecamatan Gunung Putri",
-                    code="320102",
-                    regency_id="3201",
-                    regency_name="Kabupaten Bogor"
-                ),
-                "320201": SubDistrictSchema(
-                    id="320201",
-                    name="Kecamatan Pelabuhan Ratu",
-                    code="320201",
-                    regency_id="3202",
-                    regency_name="Kabupaten Sukabumi"
+                    pum_code="320101",
+                    regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                    regency_name="Kabupaten Bogor",
+                    population_count=150000,
+                    poverty_level=12.5,
+                    area_km2=45.2
                 )
-            }
+                return mock_subdistrict
             
-            subdistrict = mock_subdistricts.get(subdistrict_id)
+            subdistrict = self.db.query(Subdistrict).filter(Subdistrict.id == subdistrict_id).first()
+            
             if not subdistrict:
                 logger.warning(f"Sub-district with ID {subdistrict_id} not found")
                 return None
+            
+            subdistrict_schema = SubDistrictSchema(
+                id=subdistrict.id,
+                name=subdistrict.name,
+                pum_code=subdistrict.pum_code,
+                regency_id=subdistrict.regency_id,
+                regency_name=subdistrict.regency.name if subdistrict.regency else None,
+                population_count=subdistrict.population_count,
+                poverty_level=subdistrict.poverty_level,
+                area_km2=subdistrict.area_km2
+            )
                 
             logger.info(f"Retrieved sub-district: {subdistrict.name}")
-            return subdistrict
+            return subdistrict_schema
             
         except Exception as e:
             logger.error(f"Error retrieving sub-district {subdistrict_id}: {str(e)}")
             raise
     
-    async def get_facilities_by_subdistrict(self, subdistrict_id: str) -> List[FacilitySchema]:
+    async def get_facilities_by_subdistrict(self, subdistrict_id: UUID) -> List[FacilitySchema]:
         """
         Get all health facilities within a specific sub-district.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_facilities = {
-                "320101": [
+            # Check if this is a mock request
+            if str(subdistrict_id) == "mock":
+                mock_facilities = [
                     FacilitySchema(
-                        id="F001",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440006"),
                         name="Puskesmas Cibinong",
                         type="puskesmas",
                         latitude=-6.4815,
                         longitude=106.8540,
-                        regency_id="3201",
+                        regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id="320101",
+                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
                     ),
                     FacilitySchema(
-                        id="F002",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440007"),
                         name="RSUD Cibinong",
                         type="hospital",
                         latitude=-6.4815,
                         longitude=106.8540,
-                        regency_id="3201",
+                        regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id="320101",
+                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
                     )
-                ],
-                "320102": [
-                    FacilitySchema(
-                        id="F003",
-                        name="Puskesmas Gunung Putri",
-                        type="puskesmas",
-                        latitude=-6.4233,
-                        longitude=106.9073,
-                        regency_id="3201",
-                        regency_name="Kabupaten Bogor",
-                        sub_district_id="320102",
-                        sub_district_name="Kecamatan Gunung Putri"
-                    )
-                ],
-                "320201": [
-                    FacilitySchema(
-                        id="F004",
-                        name="Puskesmas Pelabuhan Ratu",
-                        type="puskesmas",
-                        latitude=-7.0294,
-                        longitude=106.5500,
-                        regency_id="3202",
-                        regency_name="Kabupaten Sukabumi",
-                        sub_district_id="320201",
-                        sub_district_name="Kecamatan Pelabuhan Ratu"
-                    )
                 ]
-            }
+                return mock_facilities
             
-            facilities = mock_facilities.get(subdistrict_id, [])
-            logger.info(f"Retrieved {len(facilities)} facilities for sub-district {subdistrict_id}")
-            return facilities
+            facilities = self.db.query(HealthFacility).filter(HealthFacility.sub_district_id == subdistrict_id).all()
+            
+            facility_schemas = []
+            for facility in facilities:
+                facility_schema = FacilitySchema(
+                    id=facility.id,
+                    name=facility.name,
+                    type=facility.type,
+                    latitude=facility.latitude,
+                    longitude=facility.longitude,
+                    regency_id=facility.regency_id,
+                    regency_name=facility.regency.name if facility.regency else None,
+                    sub_district_id=facility.sub_district_id,
+                    sub_district_name=facility.sub_district.name if facility.sub_district else None
+                )
+                facility_schemas.append(facility_schema)
+            
+            logger.info(f"Retrieved {len(facility_schemas)} facilities for sub-district {subdistrict_id}")
+            return facility_schemas
             
         except Exception as e:
             logger.error(f"Error retrieving facilities for sub-district {subdistrict_id}: {str(e)}")
             raise
     
-    async def generate_heatmap_data(self, regency_id: str) -> HeatmapData:
+    async def generate_heatmap_data(self, regency_id: UUID) -> HeatmapData:
         """
         Generate heatmap data for a specific regency.
-        Currently returns mock data.
         """
         try:
             # Get regency info
-            regency = await self.get_regency_by_id(regency_id)
+            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
             if not regency:
                 raise ValueError(f"Regency with ID {regency_id} not found")
             
-            # Mock heatmap data
-            total_population = 50000
-            population_outside_radius = 15000
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_heatmap_data = HeatmapData(
+                    regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                    regency_name="Kabupaten Bogor",
+                    total_population=5000000,
+                    population_outside_radius=750000,
+                    service_radius_km=5.0,
+                    heatmap_points=[
+                        HeatmapPoint(
+                            latitude=-6.4815,
+                            longitude=106.8540,
+                            population_density=1500.0,
+                            access_score=0.8,
+                            distance_to_facility=2.5
+                        ),
+                        HeatmapPoint(
+                            latitude=-6.4233,
+                            longitude=106.9073,
+                            population_density=1200.0,
+                            access_score=0.6,
+                            distance_to_facility=4.2
+                        )
+                    ]
+                )
+                return mock_heatmap_data
+            
+            # Mock heatmap generation for now
+            # In reality, this would involve complex spatial analysis
+            heatmap_points = []
+            total_population = 5000000
+            population_outside_radius = 750000
             service_radius_km = 5.0
             
             # Generate mock heatmap points
-            heatmap_points = []
-            for i in range(20):  # Generate 20 sample points
-                lat = -6.4815 + (random.uniform(-0.1, 0.1))
-                lng = 106.8540 + (random.uniform(-0.1, 0.1))
-                
+            for i in range(10):
+                lat = -6.4 + (random.random() - 0.5) * 0.2
+                lng = 106.8 + (random.random() - 0.5) * 0.2
                 heatmap_points.append(HeatmapPoint(
                     latitude=lat,
                     longitude=lng,
-                    population_density=random.uniform(100, 1000),
-                    access_score=random.uniform(0.1, 1.0),
-                    distance_to_facility=random.uniform(0.5, 10.0)
+                    population_density=random.uniform(800, 2000),
+                    access_score=random.uniform(0.3, 0.9),
+                    distance_to_facility=random.uniform(1.0, 8.0)
                 ))
             
             heatmap_data = HeatmapData(
@@ -206,64 +228,70 @@ class AnalysisService:
                 heatmap_points=heatmap_points
             )
             
-            logger.info(f"Generated heatmap data for regency {regency_id}")
+            logger.info(f"Generated heatmap data for regency {regency.name}")
             return heatmap_data
             
         except Exception as e:
             logger.error(f"Error generating heatmap data for regency {regency_id}: {str(e)}")
             raise
     
-    async def generate_priority_score_data(self, regency_id: str) -> PriorityScoreData:
+    async def generate_priority_score_data(self, regency_id: UUID) -> PriorityScoreData:
         """
         Generate priority score data for a specific regency.
-        Currently returns mock data.
         """
         try:
             # Get regency info
-            regency = await self.get_regency_by_id(regency_id)
+            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
             if not regency:
                 raise ValueError(f"Regency with ID {regency_id} not found")
             
-            # Mock sub-district scores
-            mock_subdistricts = [
-                {
-                    "id": "320101",
-                    "name": "Kecamatan Cibinong",
-                    "gap_factor": 0.8,
-                    "efficiency_factor": 0.6,
-                    "vulnerability_factor": 0.7
-                },
-                {
-                    "id": "320102",
-                    "name": "Kecamatan Gunung Putri",
-                    "gap_factor": 0.9,
-                    "efficiency_factor": 0.5,
-                    "vulnerability_factor": 0.8
-                },
-                {
-                    "id": "320103",
-                    "name": "Kecamatan Citeureup",
-                    "gap_factor": 0.7,
-                    "efficiency_factor": 0.7,
-                    "vulnerability_factor": 0.6
-                }
-            ]
-            
-            # Calculate composite scores and rank
-            sub_district_scores = []
-            for i, subdistrict in enumerate(mock_subdistricts):
-                composite_score = (
-                    subdistrict["gap_factor"] * 0.4 +
-                    subdistrict["efficiency_factor"] * 0.3 +
-                    subdistrict["vulnerability_factor"] * 0.3
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_priority_data = PriorityScoreData(
+                    regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                    regency_name="Kabupaten Bogor",
+                    total_sub_districts=2,
+                    sub_districts=[
+                        SubDistrictScore(
+                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                            sub_district_name="Kecamatan Cibinong",
+                            gap_factor=0.75,
+                            efficiency_factor=0.65,
+                            vulnerability_factor=0.80,
+                            composite_score=0.73,
+                            rank=1
+                        ),
+                        SubDistrictScore(
+                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
+                            sub_district_name="Kecamatan Gunung Putri",
+                            gap_factor=0.60,
+                            efficiency_factor=0.70,
+                            vulnerability_factor=0.65,
+                            composite_score=0.65,
+                            rank=2
+                        )
+                    ]
                 )
+                return mock_priority_data
+            
+            # Mock priority score generation for now
+            # In reality, this would involve complex calculations
+            sub_districts = self.db.query(Subdistrict).filter(Subdistrict.regency_id == regency_id).all()
+            
+            sub_district_scores = []
+            for i, subdistrict in enumerate(sub_districts):
+                # Mock calculations for demonstration
+                gap_factor = random.uniform(0.4, 0.9)
+                efficiency_factor = random.uniform(0.3, 0.8)
+                vulnerability_factor = random.uniform(0.5, 0.9)
+                composite_score = (gap_factor + efficiency_factor + vulnerability_factor) / 3
                 
                 sub_district_scores.append(SubDistrictScore(
-                    sub_district_id=subdistrict["id"],
-                    sub_district_name=subdistrict["name"],
-                    gap_factor=subdistrict["gap_factor"],
-                    efficiency_factor=subdistrict["efficiency_factor"],
-                    vulnerability_factor=subdistrict["vulnerability_factor"],
+                    sub_district_id=subdistrict.id,
+                    sub_district_name=subdistrict.name,
+                    gap_factor=gap_factor,
+                    efficiency_factor=efficiency_factor,
+                    vulnerability_factor=vulnerability_factor,
                     composite_score=composite_score,
                     rank=i + 1
                 ))
@@ -282,76 +310,101 @@ class AnalysisService:
                 sub_districts=sub_district_scores
             )
             
-            logger.info(f"Generated priority score data for regency {regency_id}")
+            logger.info(f"Generated priority score data for regency {regency.name}")
             return priority_data
             
         except Exception as e:
             logger.error(f"Error generating priority score data for regency {regency_id}: {str(e)}")
             raise
     
-    async def get_subdistrict_details(self, subdistrict_id: str) -> SubDistrictDetails:
+    async def get_subdistrict_details(self, subdistrict_id: UUID) -> SubDistrictDetails:
         """
         Get detailed statistics for a specific sub-district.
-        Currently returns mock data.
         """
         try:
             # Get sub-district info
-            subdistrict = await self.get_subdistrict_by_id(subdistrict_id)
+            subdistrict = self.db.query(Subdistrict).filter(Subdistrict.id == subdistrict_id).first()
             if not subdistrict:
                 raise ValueError(f"Sub-district with ID {subdistrict_id} not found")
             
+            # Check if this is a mock request
+            if str(subdistrict_id) == "mock":
+                mock_details = SubDistrictDetails(
+                    sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                    sub_district_name="Kecamatan Cibinong",
+                    regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                    regency_name="Kabupaten Bogor",
+                    population=150000,
+                    area_km2=45.2,
+                    population_density=3318.58,
+                    poverty_rate=12.5,
+                    existing_facilities_count=2,
+                    existing_facilities=[
+                        {
+                            "name": "Puskesmas Cibinong",
+                            "type": "puskesmas",
+                            "latitude": -6.4815,
+                            "longitude": 106.8540
+                        },
+                        {
+                            "name": "RSUD Cibinong",
+                            "type": "hospital",
+                            "latitude": -6.4815,
+                            "longitude": 106.8540
+                        }
+                    ],
+                    gap_factor=0.75,
+                    efficiency_factor=0.65,
+                    vulnerability_factor=0.80,
+                    composite_score=0.73,
+                    rank=1
+                )
+                return mock_details
+            
             # Get facilities for this sub-district
-            facilities = await self.get_facilities_by_subdistrict(subdistrict_id)
+            facilities = self.db.query(HealthFacility).filter(HealthFacility.sub_district_id == subdistrict_id).all()
             
             # Mock detailed statistics
-            population = 25000
-            area_km2 = 45.5
-            population_density = population / area_km2
-            poverty_rate = 12.5
+            population = subdistrict.population_count or 100000
+            area_km2 = subdistrict.area_km2 or 50.0
+            population_density = population / area_km2 if area_km2 > 0 else 0
+            poverty_rate = subdistrict.poverty_level or 15.0
             
-            # Calculate scores (similar to priority score calculation)
-            gap_factor = 0.8
-            efficiency_factor = 0.6
-            vulnerability_factor = 0.7
-            composite_score = (
-                gap_factor * 0.4 +
-                efficiency_factor * 0.3 +
-                vulnerability_factor * 0.3
-            )
+            # Mock calculated scores
+            gap_factor = random.uniform(0.4, 0.9)
+            efficiency_factor = random.uniform(0.3, 0.8)
+            vulnerability_factor = random.uniform(0.5, 0.9)
+            composite_score = (gap_factor + efficiency_factor + vulnerability_factor) / 3
             
-            # Mock rank (in practice, this would be calculated across all sub-districts)
-            rank = 1
-            
-            # Convert facilities to dict format for response
+            # Convert facilities to dict format
             existing_facilities = []
             for facility in facilities:
                 existing_facilities.append({
-                    "id": facility.id,
                     "name": facility.name,
-                    "type": facility.type,
+                    "type": facility.type.value if hasattr(facility.type, 'value') else str(facility.type),
                     "latitude": facility.latitude,
                     "longitude": facility.longitude
                 })
             
             details = SubDistrictDetails(
-                sub_district_id=subdistrict_id,
+                sub_district_id=subdistrict.id,
                 sub_district_name=subdistrict.name,
                 regency_id=subdistrict.regency_id,
-                regency_name=subdistrict.regency_name,
+                regency_name=subdistrict.regency.name if subdistrict.regency else None,
                 population=population,
                 area_km2=area_km2,
                 population_density=population_density,
                 poverty_rate=poverty_rate,
-                existing_facilities_count=len(facilities),
+                existing_facilities_count=len(existing_facilities),
                 existing_facilities=existing_facilities,
                 gap_factor=gap_factor,
                 efficiency_factor=efficiency_factor,
                 vulnerability_factor=vulnerability_factor,
                 composite_score=composite_score,
-                rank=rank
+                rank=1  # Mock rank
             )
             
-            logger.info(f"Generated detailed statistics for sub-district {subdistrict_id}")
+            logger.info(f"Generated sub-district details for {subdistrict.name}")
             return details
             
         except Exception as e:

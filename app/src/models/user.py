@@ -1,10 +1,12 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, Index
+from sqlalchemy import Column, String, Boolean, DateTime, Enum, Index
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.src.config.database import Base
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 from datetime import datetime
 from enum import Enum as PydanticEnum
+import uuid
 
 # SQLAlchemy User Model for Database
 class UserProvider(str, PydanticEnum):
@@ -14,7 +16,7 @@ class UserProvider(str, PydanticEnum):
 class User(Base):
     __tablename__ = "users"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String, unique=True, index=True, nullable=True)
     username = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String, nullable=True)
@@ -30,7 +32,7 @@ class UserProviderEnum(str, PydanticEnum):
     EMAIL = "email"
 
 class UserSchema(BaseModel):
-    id: Optional[int] = None
+    id: Optional[uuid.UUID] = None
     email: Optional[str] = None
     username: Optional[str] = None
     provider: Optional[str] = None # Added
@@ -42,7 +44,8 @@ class UserSchema(BaseModel):
     class Config:
         from_attributes = True
         json_encoders = {
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat(),
+            uuid.UUID: lambda v: str(v)
         }
 
 class UserSchemaWithPassword(UserSchema):

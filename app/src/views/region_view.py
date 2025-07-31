@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from typing import Optional
+from typing import Optional, Union
 from app.src.schemas.region_schema import (
     ProvinceListResponse,
     RegencyListResponse,
@@ -10,6 +10,7 @@ from app.src.schemas.user_schema import UserSchema
 from app.src.middleware.auth_middleware import get_current_user_required
 from app.src.services.region_service import RegionService
 from app.src.utils.exceptions import NotFoundException
+from uuid import UUID
 
 # Create router with prefix and tags
 region_router = APIRouter(prefix="/regions", tags=["Regions"])
@@ -52,7 +53,7 @@ async def get_provinces(
     description="Retrieve all regencies (Kabupaten/Kota) within a specific province. This is the next step in the user's journey, narrowing down the area of interest."
 )
 async def get_regencies(
-    province_id: str = Query(..., description="ID of the province to get regencies for"),
+    province_id: Union[UUID, str] = Query(..., description="ID of the province to get regencies for (use 'mock' for testing)"),
     current_user: UserSchema = Depends(get_current_user_required)
 ) -> RegencyListResponse:
     """
@@ -60,18 +61,31 @@ async def get_regencies(
     
     This endpoint returns all regencies (Kabupaten/Kota) for a given province,
     allowing users to narrow down their area of interest for analysis.
+    
+    For development testing, use province_id="mock" to get mock data.
     """
     try:
-        # Validate that the province exists
-        province = await region_service.get_province_by_id(province_id)
-        if not province:
-            raise NotFoundException(f"Province with ID {province_id} not found")
+        # Convert string to UUID if needed
+        if isinstance(province_id, str) and province_id != "mock":
+            try:
+                province_id = UUID(province_id)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid UUID format"
+                )
+        
+        # Validate that the province exists (skip for mock)
+        if province_id != "mock":
+            province = await region_service.get_province_by_id(province_id)
+            if not province:
+                raise NotFoundException(f"Province with ID {province_id} not found")
         
         regencies = await region_service.get_regencies_by_province(province_id)
         return RegencyListResponse(
             regencies=regencies,
             total=len(regencies),
-            province_id=province_id
+            province_id=province_id if isinstance(province_id, UUID) else UUID("550e8400-e29b-41d4-a716-446655440001")
         )
     except NotFoundException as e:
         raise HTTPException(
@@ -91,24 +105,33 @@ async def get_regencies(
     description="Retrieve all sub-districts (Kecamatan) within a specific regency. This provides detailed administrative boundaries for analysis."
 )
 async def get_subdistricts(
-    regency_id: str = Query(..., description="ID of the regency to get sub-districts for"),
+    regency_id: Union[UUID, str] = Query(..., description="ID of the regency to get sub-districts for (use 'mock' for testing)"),
     current_user: UserSchema = Depends(get_current_user_required)
 ) -> SubDistrictListResponse:
     """
     Get all sub-districts within a specific regency.
     
     This endpoint returns all sub-districts (Kecamatan) for a given regency,
-    providing detailed administrative boundaries that can be used for filtering
-    or detailed analysis.
+    providing detailed administrative boundaries for analysis and visualization.
+    
+    For development testing, use regency_id="mock" to get mock data.
     """
     try:
-        # Validate that the regency exists (by checking if it has any sub-districts)
-        subdistricts = await region_service.get_subdistricts_by_regency(regency_id)
+        # Convert string to UUID if needed
+        if isinstance(regency_id, str) and regency_id != "mock":
+            try:
+                regency_id = UUID(regency_id)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid UUID format"
+                )
         
+        subdistricts = await region_service.get_subdistricts_by_regency(regency_id)
         return SubDistrictListResponse(
             sub_districts=subdistricts,
             total=len(subdistricts),
-            regency_id=regency_id
+            regency_id=regency_id if isinstance(regency_id, UUID) else UUID("550e8400-e29b-41d4-a716-446655440002")
         )
     except Exception as e:
         raise HTTPException(
@@ -123,24 +146,34 @@ async def get_subdistricts(
     description="Retrieve all health facilities within a specific regency. This provides the existing healthcare landscape for analysis and visualization."
 )
 async def get_facilities(
-    regency_id: str = Query(..., description="ID of the regency to get facilities for"),
+    regency_id: Union[UUID, str] = Query(..., description="ID of the regency to get facilities for (use 'mock' for testing)"),
     current_user: UserSchema = Depends(get_current_user_required)
 ) -> FacilityListResponse:
     """
     Get all health facilities within a specific regency.
     
     This endpoint returns all health facilities (Puskesmas, hospitals, clinics, etc.)
-    for a given regency, providing the existing healthcare landscape that is essential
-    for heatmap analysis and simulation algorithms.
+    for a given regency, providing the existing healthcare landscape for analysis
+    and visualization.
+    
+    For development testing, use regency_id="mock" to get mock data.
     """
     try:
-        # Validate that the regency exists (by checking if it has any facilities)
-        facilities = await region_service.get_facilities_by_regency(regency_id)
+        # Convert string to UUID if needed
+        if isinstance(regency_id, str) and regency_id != "mock":
+            try:
+                regency_id = UUID(regency_id)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid UUID format"
+                )
         
+        facilities = await region_service.get_facilities_by_regency(regency_id)
         return FacilityListResponse(
             facilities=facilities,
             total=len(facilities),
-            regency_id=regency_id
+            regency_id=regency_id if isinstance(regency_id, UUID) else UUID("550e8400-e29b-41d4-a716-446655440002")
         )
     except Exception as e:
         raise HTTPException(

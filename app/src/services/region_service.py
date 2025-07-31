@@ -1,9 +1,14 @@
 from typing import List, Optional
 from app.src.schemas.region_schema import ProvinceSchema, RegencySchema, SubDistrictSchema, FacilitySchema
 from app.src.config.database import SessionLocal
-from sqlalchemy.orm import Session
+from app.src.models.province import Province
+from app.src.models.regency import Regency
+from app.src.models.subdistrict import Subdistrict
+from app.src.models.health_facility import HealthFacility
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 import logging
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -14,230 +19,214 @@ class RegionService:
     async def get_all_provinces(self) -> List[ProvinceSchema]:
         """
         Get all provinces in Indonesia.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_provinces = [
-                ProvinceSchema(
-                    id="32",
-                    name="Jawa Barat",
-                    code="32"
-                ),
-                ProvinceSchema(
-                    id="31",
-                    name="DKI Jakarta",
-                    code="31"
-                ),
-                ProvinceSchema(
-                    id="36",
-                    name="Banten",
-                    code="36"
-                )
-            ]
+            provinces = self.db.query(Province).all()
             
-            logger.info(f"Retrieved {len(mock_provinces)} provinces")
-            return mock_provinces
+            province_schemas = []
+            for province in provinces:
+                province_schemas.append(ProvinceSchema(
+                    id=province.id,
+                    name=province.name,
+                    pum_code=province.pum_code,
+                    area_km2=province.area_km2
+                ))
+            
+            logger.info(f"Retrieved {len(province_schemas)} provinces")
+            return province_schemas
             
         except Exception as e:
             logger.error(f"Error retrieving provinces: {str(e)}")
             raise
     
-    async def get_province_by_id(self, province_id: str) -> Optional[ProvinceSchema]:
+    async def get_province_by_id(self, province_id: UUID) -> Optional[ProvinceSchema]:
         """
         Get a specific province by ID.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_provinces = {
-                "32": ProvinceSchema(id="32", name="Jawa Barat", code="32"),
-                "31": ProvinceSchema(id="31", name="DKI Jakarta", code="31"),
-                "36": ProvinceSchema(id="36", name="Banten", code="36")
-            }
+            # Check if this is a mock request
+            if str(province_id) == "mock":
+                mock_provinces = {
+                    "mock": ProvinceSchema(
+                        id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                        name="Jawa Barat",
+                        pum_code="32",
+                        area_km2=35377.76
+                    )
+                }
+                return mock_provinces.get("mock")
             
-            province = mock_provinces.get(province_id)
+            province = self.db.query(Province).filter(Province.id == province_id).first()
+            
             if not province:
                 logger.warning(f"Province with ID {province_id} not found")
                 return None
+            
+            province_schema = ProvinceSchema(
+                id=province.id,
+                name=province.name,
+                pum_code=province.pum_code,
+                area_km2=province.area_km2
+            )
                 
             logger.info(f"Retrieved province: {province.name}")
-            return province
+            return province_schema
             
         except Exception as e:
             logger.error(f"Error retrieving province {province_id}: {str(e)}")
             raise
     
-    async def get_regencies_by_province(self, province_id: str) -> List[RegencySchema]:
+    async def get_regencies_by_province(self, province_id: UUID) -> List[RegencySchema]:
         """
         Get all regencies within a specific province.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_regencies = {
-                "32": [
+            # Check if this is a mock request
+            if str(province_id) == "mock":
+                mock_regencies = [
                     RegencySchema(
-                        id="3201",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         name="Kabupaten Bogor",
-                        code="3201",
-                        province_id="32",
-                        province_name="Jawa Barat"
+                        pum_code="3201",
+                        province_id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                        province_name="Jawa Barat",
+                        area_km2=2985.43
                     ),
                     RegencySchema(
-                        id="3202",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440003"),
                         name="Kabupaten Sukabumi",
-                        code="3202",
-                        province_id="32",
-                        province_name="Jawa Barat"
-                    )
-                ],
-                "31": [
-                    RegencySchema(
-                        id="3101",
-                        name="Kabupaten Kepulauan Seribu",
-                        code="3101",
-                        province_id="31",
-                        province_name="DKI Jakarta"
-                    )
-                ],
-                "36": [
-                    RegencySchema(
-                        id="3601",
-                        name="Kabupaten Pandeglang",
-                        code="3601",
-                        province_id="36",
-                        province_name="Banten"
+                        pum_code="3202",
+                        province_id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                        province_name="Jawa Barat",
+                        area_km2=4181.77
                     )
                 ]
-            }
+                return mock_regencies
             
-            regencies = mock_regencies.get(province_id, [])
-            logger.info(f"Retrieved {len(regencies)} regencies for province {province_id}")
-            return regencies
+            regencies = self.db.query(Regency).filter(Regency.province_id == province_id).all()
+            
+            regency_schemas = []
+            for regency in regencies:
+                regency_schemas.append(RegencySchema(
+                    id=regency.id,
+                    name=regency.name,
+                    pum_code=regency.pum_code,
+                    province_id=regency.province_id,
+                    province_name=regency.province.name if regency.province else None,
+                    area_km2=regency.area_km2
+                ))
+            
+            logger.info(f"Retrieved {len(regency_schemas)} regencies for province {province_id}")
+            return regency_schemas
             
         except Exception as e:
             logger.error(f"Error retrieving regencies for province {province_id}: {str(e)}")
             raise
     
-    async def get_subdistricts_by_regency(self, regency_id: str) -> List[SubDistrictSchema]:
+    async def get_subdistricts_by_regency(self, regency_id: UUID) -> List[SubDistrictSchema]:
         """
         Get all sub-districts within a specific regency.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_subdistricts = {
-                "3201": [
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_subdistricts = [
                     SubDistrictSchema(
-                        id="320101",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         name="Kecamatan Cibinong",
-                        code="320101",
-                        regency_id="3201",
-                        regency_name="Kabupaten Bogor"
+                        pum_code="320101",
+                        regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                        regency_name="Kabupaten Bogor",
+                        population_count=150000,
+                        poverty_level=12.5,
+                        area_km2=45.2
                     ),
                     SubDistrictSchema(
-                        id="320102",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440005"),
                         name="Kecamatan Gunung Putri",
-                        code="320102",
-                        regency_id="3201",
-                        regency_name="Kabupaten Bogor"
-                    ),
-                    SubDistrictSchema(
-                        id="320103",
-                        name="Kecamatan Citeureup",
-                        code="320103",
-                        regency_id="3201",
-                        regency_name="Kabupaten Bogor"
-                    )
-                ],
-                "3202": [
-                    SubDistrictSchema(
-                        id="320201",
-                        name="Kecamatan Pelabuhan Ratu",
-                        code="320201",
-                        regency_id="3202",
-                        regency_name="Kabupaten Sukabumi"
-                    ),
-                    SubDistrictSchema(
-                        id="320202",
-                        name="Kecamatan Simpenan",
-                        code="320202",
-                        regency_id="3202",
-                        regency_name="Kabupaten Sukabumi"
+                        pum_code="320102",
+                        regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                        regency_name="Kabupaten Bogor",
+                        population_count=120000,
+                        poverty_level=10.8,
+                        area_km2=38.7
                     )
                 ]
-            }
+                return mock_subdistricts
             
-            subdistricts = mock_subdistricts.get(regency_id, [])
-            logger.info(f"Retrieved {len(subdistricts)} sub-districts for regency {regency_id}")
-            return subdistricts
+            subdistricts = self.db.query(Subdistrict).filter(Subdistrict.regency_id == regency_id).all()
+            
+            subdistrict_schemas = []
+            for subdistrict in subdistricts:
+                subdistrict_schemas.append(SubDistrictSchema(
+                    id=subdistrict.id,
+                    name=subdistrict.name,
+                    pum_code=subdistrict.pum_code,
+                    regency_id=subdistrict.regency_id,
+                    regency_name=subdistrict.regency.name if subdistrict.regency else None,
+                    population_count=subdistrict.population_count,
+                    poverty_level=subdistrict.poverty_level,
+                    area_km2=subdistrict.area_km2
+                ))
+            
+            logger.info(f"Retrieved {len(subdistrict_schemas)} subdistricts for regency {regency_id}")
+            return subdistrict_schemas
             
         except Exception as e:
-            logger.error(f"Error retrieving sub-districts for regency {regency_id}: {str(e)}")
+            logger.error(f"Error retrieving subdistricts for regency {regency_id}: {str(e)}")
             raise
     
-    async def get_facilities_by_regency(self, regency_id: str) -> List[FacilitySchema]:
+    async def get_facilities_by_regency(self, regency_id: UUID) -> List[FacilitySchema]:
         """
         Get all health facilities within a specific regency.
-        Currently returns mock data.
         """
         try:
-            # Mock data - replace with actual database query
-            mock_facilities = {
-                "3201": [
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_facilities = [
                     FacilitySchema(
-                        id="F001",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440006"),
                         name="Puskesmas Cibinong",
                         type="puskesmas",
                         latitude=-6.4815,
                         longitude=106.8540,
-                        regency_id="3201",
+                        regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id="320101",
+                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
                     ),
                     FacilitySchema(
-                        id="F002",
+                        id=UUID("550e8400-e29b-41d4-a716-446655440007"),
                         name="RSUD Cibinong",
                         type="hospital",
                         latitude=-6.4815,
                         longitude=106.8540,
-                        regency_id="3201",
+                        regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id="320101",
+                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
-                    ),
-                    FacilitySchema(
-                        id="F003",
-                        name="Puskesmas Gunung Putri",
-                        type="puskesmas",
-                        latitude=-6.4233,
-                        longitude=106.9073,
-                        regency_id="3201",
-                        regency_name="Kabupaten Bogor",
-                        sub_district_id="320102",
-                        sub_district_name="Kecamatan Gunung Putri"
-                    )
-                ],
-                "3202": [
-                    FacilitySchema(
-                        id="F004",
-                        name="Puskesmas Pelabuhan Ratu",
-                        type="puskesmas",
-                        latitude=-7.0294,
-                        longitude=106.5500,
-                        regency_id="3202",
-                        regency_name="Kabupaten Sukabumi",
-                        sub_district_id="320201",
-                        sub_district_name="Kecamatan Pelabuhan Ratu"
                     )
                 ]
-            }
+                return mock_facilities
             
-            facilities = mock_facilities.get(regency_id, [])
-            logger.info(f"Retrieved {len(facilities)} facilities for regency {regency_id}")
-            return facilities
+            facilities = self.db.query(HealthFacility).filter(HealthFacility.regency_id == regency_id).all()
+            
+            facility_schemas = []
+            for facility in facilities:
+                facility_schemas.append(FacilitySchema(
+                    id=facility.id,
+                    name=facility.name,
+                    type=facility.facility_type,
+                    latitude=facility.latitude,
+                    longitude=facility.longitude,
+                    regency_id=facility.regency_id,
+                    regency_name=facility.regency.name if facility.regency else None,
+                    sub_district_id=facility.subdistrict_id,
+                    sub_district_name=facility.subdistrict.name if facility.subdistrict else None
+                ))
+            
+            logger.info(f"Retrieved {len(facility_schemas)} facilities for regency {regency_id}")
+            return facility_schemas
             
         except Exception as e:
             logger.error(f"Error retrieving facilities for regency {regency_id}: {str(e)}")

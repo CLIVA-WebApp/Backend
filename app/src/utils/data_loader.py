@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from shapely.geometry import MultiPolygon
 from shapely import force_2d
+import uuid
 
 from app.src.config.database import SessionLocal
 from app.src.models.province import Province
@@ -88,14 +89,14 @@ class GDBDataLoader:
             'subdistricts': subdistricts
         }
     
-    def load_provinces(self, provinces_df: pd.DataFrame) -> Dict[str, int]:
+    def load_provinces(self, provinces_df: pd.DataFrame) -> Dict[str, uuid.UUID]:
         """Load provinces into database and return mapping of codes to IDs"""
         province_mapping = {}
         
         for _, row in provinces_df.iterrows():
-            # Check if province already exists
+            # Check if province already exists by PUM code
             existing = self.db.query(Province).filter(
-                Province.name == row['WADMPR']
+                Province.pum_code == row['KDPPUM']
             ).first()
             
             if existing:
@@ -107,6 +108,7 @@ class GDBDataLoader:
             
             # Create new province
             province = Province(
+                pum_code=row['KDPPUM'],
                 name=row['WADMPR'],
                 area_km2=area_km2,
                 geom=f"SRID=4326;{row['geometry'].wkt}"
@@ -116,13 +118,13 @@ class GDBDataLoader:
             self.db.flush()  # Get the ID
             province_mapping[row['KDPPUM']] = province.id
             
-            logger.info(f"Added province: {row['WADMPR']}")
+            logger.info(f"Added province: {row['WADMPR']} (PUM: {row['KDPPUM']})")
         
         self.db.commit()
         logger.info(f"Loaded {len(province_mapping)} provinces")
         return province_mapping
     
-    def load_regencies(self, regencies_df: pd.DataFrame, province_mapping: Dict[str, int]) -> Dict[str, int]:
+    def load_regencies(self, regencies_df: pd.DataFrame, province_mapping: Dict[str, uuid.UUID]) -> Dict[str, uuid.UUID]:
         """Load regencies into database and return mapping of codes to IDs"""
         regency_mapping = {}
         
@@ -132,10 +134,9 @@ class GDBDataLoader:
                 logger.warning(f"Skipping regency {row['WADMKK']} - province not found")
                 continue
             
-            # Check if regency already exists
+            # Check if regency already exists by PUM code
             existing = self.db.query(Regency).filter(
-                Regency.name == row['WADMKK'],
-                Regency.province_id == province_id
+                Regency.pum_code == row['KDPKAB']
             ).first()
             
             if existing:
@@ -147,6 +148,7 @@ class GDBDataLoader:
             
             # Create new regency
             regency = Regency(
+                pum_code=row['KDPKAB'],
                 name=row['WADMKK'],
                 province_id=province_id,
                 area_km2=area_km2,
@@ -157,13 +159,13 @@ class GDBDataLoader:
             self.db.flush()
             regency_mapping[row['KDPKAB']] = regency.id
             
-            logger.info(f"Added regency: {row['WADMKK']}")
+            logger.info(f"Added regency: {row['WADMKK']} (PUM: {row['KDPKAB']})")
         
         self.db.commit()
         logger.info(f"Loaded {len(regency_mapping)} regencies")
         return regency_mapping
     
-    def load_subdistricts(self, subdistricts_df: pd.DataFrame, regency_mapping: Dict[str, int]):
+    def load_subdistricts(self, subdistricts_df: pd.DataFrame, regency_mapping: Dict[str, uuid.UUID]):
         """Load subdistricts into database"""
         count = 0
         
@@ -173,10 +175,9 @@ class GDBDataLoader:
                 logger.warning(f"Skipping subdistrict {row['WADMKC']} - regency not found")
                 continue
             
-            # Check if subdistrict already exists
+            # Check if subdistrict already exists by PUM code
             existing = self.db.query(Subdistrict).filter(
-                Subdistrict.name == row['WADMKC'],
-                Subdistrict.regency_id == regency_id
+                Subdistrict.pum_code == row['KDCPUM']
             ).first()
             
             if existing:
@@ -187,6 +188,7 @@ class GDBDataLoader:
             
             # Create new subdistrict
             subdistrict = Subdistrict(
+                pum_code=row['KDCPUM'],
                 name=row['WADMKC'],
                 regency_id=regency_id,
                 area_km2=area_km2,
@@ -239,4 +241,4 @@ def main():
     loader.load_all_data()
 
 if __name__ == "__main__":
-    main() 
+    main()

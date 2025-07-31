@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, String, Float, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from app.src.config.database import Base
+import uuid
 
 class Regency(Base):
     """
@@ -9,10 +11,11 @@ class Regency(Base):
     """
     __tablename__ = "regencies"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    pum_code = Column(String(50), unique=True, nullable=True, index=True)  # KDPKAB
     name = Column(String, nullable=False, index=True)
     
-    province_id = Column(Integer, ForeignKey("provinces.id"), nullable=False)
+    province_id = Column(UUID(as_uuid=True), ForeignKey("provinces.id"), nullable=False)
     
     # Area in square kilometers (calculated from geometry)
     area_km2 = Column(Float, nullable=True)

@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, String, Float, ForeignKey, Integer
+from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from app.src.config.database import Base
+import uuid
 
 class Subdistrict(Base):
     """
@@ -9,10 +11,11 @@ class Subdistrict(Base):
     """
     __tablename__ = "subdistricts"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    pum_code = Column(String(50), unique=True, nullable=True, index=True)  # KDCPUM
     name = Column(String, nullable=False, index=True)
     
-    regency_id = Column(Integer, ForeignKey("regencies.id"), nullable=False)
+    regency_id = Column(UUID(as_uuid=True), ForeignKey("regencies.id"), nullable=False)
     
     # Demographic data, to be joined from BPS sources.
     population_count = Column(Integer, nullable=True)

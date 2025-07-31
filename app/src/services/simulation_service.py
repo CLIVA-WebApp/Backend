@@ -5,11 +5,13 @@ from app.src.schemas.analysis_schema import (
 )
 from app.src.schemas.region_schema import RegencySchema
 from app.src.config.database import SessionLocal
+from app.src.models.regency import Regency
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 import math
 import random
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ class SimulationService:
     def __init__(self):
         self.db: Session = SessionLocal()
     
-    async def get_regency_by_id(self, regency_id: str) -> Optional[RegencySchema]:
+    async def get_regency_by_id(self, regency_id: UUID) -> Optional[RegencySchema]:
         """
         Retrieve a specific regency by ID.
         
@@ -28,35 +30,40 @@ class SimulationService:
             Optional[RegencySchema]: Regency data if found, None otherwise
         """
         try:
-            # This is a placeholder implementation
-            # In a real implementation, you would query your database
-            
-            # Mock data for demonstration
-            regencies = {
-                "3201": RegencySchema(
-                    id="3201",
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_regency = RegencySchema(
+                    id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                     name="Kabupaten Bogor",
-                    code="3201",
-                    province_id="32",
-                    province_name="Jawa Barat"
-                ),
-                "3171": RegencySchema(
-                    id="3171",
-                    name="Kota Jakarta Selatan",
-                    code="3171",
-                    province_id="31",
-                    province_name="DKI Jakarta"
+                    pum_code="3201",
+                    province_id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                    province_name="Jawa Barat",
+                    area_km2=2985.43
                 )
-            }
+                return mock_regency
             
-            return regencies.get(regency_id)
+            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
+            
+            if not regency:
+                return None
+            
+            regency_schema = RegencySchema(
+                id=regency.id,
+                name=regency.name,
+                pum_code=regency.pum_code,
+                province_id=regency.province_id,
+                province_name=regency.province.name if regency.province else None,
+                area_km2=regency.area_km2
+            )
+            
+            return regency_schema
         except Exception as e:
             logger.error(f"Error retrieving regency {regency_id}: {str(e)}")
             raise
     
     async def run_optimization_simulation(
         self,
-        regency_id: str,
+        regency_id: UUID,
         budget: float,
         facility_type: str,
         optimization_criteria: List[str]
@@ -81,19 +88,52 @@ class SimulationService:
             SimulationResult: Optimization results including recommended facility locations
         """
         try:
-            # This is a placeholder implementation
-            # In a real implementation, you would:
-            # 1. Query population data and distribution
-            # 2. Query existing health facility locations
-            # 3. Query transportation infrastructure data
-            # 4. Run sophisticated optimization algorithms (e.g., genetic algorithm, linear programming)
-            # 5. Consider multiple constraints and objectives
-            # 6. Return optimal facility locations
-            
             # Validate regency exists
             regency = await self.get_regency_by_id(regency_id)
             if not regency:
                 raise ValueError(f"Regency {regency_id} not found")
+            
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_simulation_result = SimulationResult(
+                    regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                    regency_name="Kabupaten Bogor",
+                    total_budget=budget,
+                    budget_used=budget * 0.85,
+                    facilities_recommended=3,
+                    total_population_covered=450000,
+                    coverage_percentage=90.0,
+                    optimized_facilities=[
+                        OptimizedFacility(
+                            latitude=-6.4233,
+                            longitude=106.9073,
+                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
+                            sub_district_name="Kecamatan Gunung Putri",
+                            estimated_cost=budget * 0.3,
+                            population_covered=150000,
+                            coverage_radius_km=5.0
+                        ),
+                        OptimizedFacility(
+                            latitude=-6.4815,
+                            longitude=106.8540,
+                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                            sub_district_name="Kecamatan Cibinong",
+                            estimated_cost=budget * 0.35,
+                            population_covered=200000,
+                            coverage_radius_km=5.0
+                        ),
+                        OptimizedFacility(
+                            latitude=-6.5000,
+                            longitude=106.8000,
+                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                            sub_district_name="Kecamatan Cibinong",
+                            estimated_cost=budget * 0.2,
+                            population_covered=100000,
+                            coverage_radius_km=5.0
+                        )
+                    ]
+                )
+                return mock_simulation_result
             
             # Mock optimization simulation
             # In reality, this would involve complex algorithms
