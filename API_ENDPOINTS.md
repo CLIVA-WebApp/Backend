@@ -69,6 +69,84 @@ Retrieve all regencies (Kabupaten/Kota) within a specific province.
 }
 ```
 
+#### GET /api/v1/regions/subdistricts?regency_id={id}
+
+Retrieve all sub-districts (Kecamatan) within a specific regency.
+
+**Purpose**: Provides detailed administrative boundaries for analysis and filtering.
+
+**Authentication**: Required
+
+**Parameters**:
+- `regency_id` (required): ID of the regency to get sub-districts for
+
+**Response**:
+```json
+{
+  "sub_districts": [
+    {
+      "id": "320101",
+      "name": "Kecamatan Cibinong",
+      "code": "320101",
+      "regency_id": "3201",
+      "regency_name": "Kabupaten Bogor"
+    },
+    {
+      "id": "320102",
+      "name": "Kecamatan Gunung Putri",
+      "code": "320102",
+      "regency_id": "3201",
+      "regency_name": "Kabupaten Bogor"
+    }
+  ],
+  "total": 2,
+  "regency_id": "3201"
+}
+```
+
+#### GET /api/v1/regions/facilities?regency_id={id}
+
+Retrieve all health facilities within a specific regency.
+
+**Purpose**: Provides the existing healthcare landscape for analysis and visualization.
+
+**Authentication**: Required
+
+**Parameters**:
+- `regency_id` (required): ID of the regency to get facilities for
+
+**Response**:
+```json
+{
+  "facilities": [
+    {
+      "id": "F001",
+      "name": "Puskesmas Cibinong",
+      "type": "puskesmas",
+      "latitude": -6.4815,
+      "longitude": 106.8540,
+      "regency_id": "3201",
+      "regency_name": "Kabupaten Bogor",
+      "sub_district_id": "320101",
+      "sub_district_name": "Kecamatan Cibinong"
+    },
+    {
+      "id": "F002",
+      "name": "RSUD Cibinong",
+      "type": "hospital",
+      "latitude": -6.4815,
+      "longitude": 106.8540,
+      "regency_id": "3201",
+      "regency_name": "Kabupaten Bogor",
+      "sub_district_id": "320101",
+      "sub_district_name": "Kecamatan Cibinong"
+    }
+  ],
+  "total": 2,
+  "regency_id": "3201"
+}
+```
+
 ### Analysis
 
 #### GET /api/v1/analysis/heatmap?regency_id={id}
@@ -122,7 +200,7 @@ Deliver the Equity Prioritization Score.
   "sub_districts": [
     {
       "sub_district_id": "320101",
-      "sub_district_name": "Kecamatan 1",
+      "sub_district_name": "Kecamatan Cibinong",
       "gap_factor": 0.8,
       "efficiency_factor": 0.6,
       "vulnerability_factor": 0.7,
@@ -130,6 +208,53 @@ Deliver the Equity Prioritization Score.
       "rank": 1
     }
   ]
+}
+```
+
+#### GET /api/v1/analysis/subdistrict-details?subdistrict_id={id}
+
+Retrieve detailed statistics for a specific sub-district.
+
+**Purpose**: Provides comprehensive information about a sub-district when users click on it for detailed analysis.
+
+**Authentication**: Required
+
+**Parameters**:
+- `subdistrict_id` (required): ID of the sub-district for detailed analysis
+
+**Response**:
+```json
+{
+  "sub_district_id": "320101",
+  "sub_district_name": "Kecamatan Cibinong",
+  "regency_id": "3201",
+  "regency_name": "Kabupaten Bogor",
+  "population": 25000,
+  "area_km2": 45.5,
+  "population_density": 549.45,
+  "poverty_rate": 12.5,
+  "existing_facilities_count": 2,
+  "existing_facilities": [
+    {
+      "id": "F001",
+      "name": "Puskesmas Cibinong",
+      "type": "puskesmas",
+      "latitude": -6.4815,
+      "longitude": 106.8540
+    },
+    {
+      "id": "F002",
+      "name": "RSUD Cibinong",
+      "type": "hospital",
+      "latitude": -6.4815,
+      "longitude": 106.8540
+    }
+  ],
+  "gap_factor": 0.8,
+  "efficiency_factor": 0.6,
+  "vulnerability_factor": 0.7,
+  "composite_score": 0.71,
+  "rank": 1
 }
 ```
 
@@ -171,7 +296,7 @@ Execute the "'What-If' Optimization Simulator".
       "latitude": -6.2088,
       "longitude": 106.8456,
       "sub_district_id": "320101",
-      "sub_district_name": "Kecamatan 1",
+      "sub_district_name": "Kecamatan Cibinong",
       "estimated_cost": 4250000,
       "population_covered": 12500,
       "coverage_radius_km": 5.0
@@ -179,6 +304,54 @@ Execute the "'What-If' Optimization Simulator".
   ]
 }
 ```
+
+### Reports
+
+#### POST /api/v1/reports/export
+
+Generate a downloadable report (PDF/CSV) from analysis or simulation results.
+
+**Purpose**: Creates formatted reports for budget proposals and stakeholder presentations.
+
+**Authentication**: Required
+
+**Request Body**:
+```json
+{
+  "report_type": "simulation_results",
+  "data": {
+    "regency_id": "3201",
+    "regency_name": "Kabupaten Bogor",
+    "total_budget": 10000000,
+    "budget_used": 8500000,
+    "facilities_recommended": 2,
+    "total_population_covered": 25000,
+    "coverage_percentage": 50.0,
+    "optimized_facilities": []
+  },
+  "format": "csv"
+}
+```
+
+**Response**:
+```json
+{
+  "filename": "simulation_results_20231201_143022.csv",
+  "download_url": "/api/v1/reports/download/simulation_results_20231201_143022.csv",
+  "file_size_bytes": 2048,
+  "generated_at": "2023-12-01T14:30:22"
+}
+```
+
+**Supported Report Types**:
+- `simulation_results`: Results from optimization simulation
+- `priority_ranking`: Sub-district priority rankings
+- `heatmap_analysis`: Health access heatmap data
+- `subdistrict_details`: Detailed sub-district statistics
+
+**Supported Formats**:
+- `pdf`: Portable Document Format
+- `csv`: Comma-Separated Values
 
 ## Error Responses
 
@@ -233,11 +406,35 @@ const regenciesResponse = await fetch(`/api/v1/regions/regencies?province_id=${s
 });
 const regencies = await regenciesResponse.json();
 
+// Get sub-districts for selected regency
+const subdistrictsResponse = await fetch(`/api/v1/regions/subdistricts?regency_id=${selectedRegencyId}`, {
+  credentials: 'include'
+});
+const subdistricts = await subdistrictsResponse.json();
+
+// Get facilities for selected regency
+const facilitiesResponse = await fetch(`/api/v1/regions/facilities?regency_id=${selectedRegencyId}`, {
+  credentials: 'include'
+});
+const facilities = await facilitiesResponse.json();
+
 // Generate heatmap for selected regency
 const heatmapResponse = await fetch(`/api/v1/analysis/heatmap?regency_id=${selectedRegencyId}`, {
   credentials: 'include'
 });
 const heatmapData = await heatmapResponse.json();
+
+// Get priority scores for selected regency
+const priorityResponse = await fetch(`/api/v1/analysis/priority-score?regency_id=${selectedRegencyId}`, {
+  credentials: 'include'
+});
+const priorityData = await priorityResponse.json();
+
+// Get detailed information for a specific sub-district
+const detailsResponse = await fetch(`/api/v1/analysis/subdistrict-details?subdistrict_id=${selectedSubdistrictId}`, {
+  credentials: 'include'
+});
+const subdistrictDetails = await detailsResponse.json();
 
 // Run optimization simulation
 const simulationResponse = await fetch('/api/v1/simulation/run', {
@@ -254,6 +451,21 @@ const simulationResponse = await fetch('/api/v1/simulation/run', {
   })
 });
 const simulationResult = await simulationResponse.json();
+
+// Export simulation results as CSV
+const exportResponse = await fetch('/api/v1/reports/export', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  credentials: 'include',
+  body: JSON.stringify({
+    report_type: 'simulation_results',
+    data: simulationResult,
+    format: 'csv'
+  })
+});
+const exportResult = await exportResponse.json();
 ```
 
 ## Implementation Notes
@@ -263,4 +475,11 @@ const simulationResult = await simulationResponse.json();
 - Database queries are currently mocked but structured for easy integration with real data
 - Error handling is consistent across all endpoints
 - The API follows RESTful conventions
-- All endpoints are documented with OpenAPI/Swagger at `/docs` 
+- All endpoints are documented with OpenAPI/Swagger at `/docs`
+- Report generation creates files in a `reports/` directory
+- The API structure is now ready for:
+  1. **Frontend Integration**: All endpoints are documented with examples
+  2. **Database Integration**: Service layer is structured for easy database integration
+  3. **Real Algorithm Implementation**: Placeholder methods are ready for actual optimization algorithms
+  4. **Testing**: Basic test structure is in place
+  5. **Report Generation**: CSV and PDF report generation is implemented 

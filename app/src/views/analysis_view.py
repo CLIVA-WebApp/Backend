@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from typing import Optional
 from app.src.schemas.analysis_schema import (
     HeatmapData,
-    PriorityScoreData
+    PriorityScoreData,
+    SubDistrictDetails
 )
 from app.src.schemas.user_schema import UserSchema
 from app.src.middleware.auth_middleware import get_current_user_required
@@ -28,18 +29,13 @@ async def get_heatmap(
     """
     Get health access heatmap data for a specific regency.
     
-    This endpoint calculates and returns the data needed to generate a "Health Access Heatmap"
-    for the chosen regency. The calculation is based on the proportion of the population
-    living outside a defined service radius of the nearest health facility.
-    
-    The heatmap visualization helps identify areas with poor health facility access,
-    enabling targeted interventions to improve healthcare accessibility.
-    
-    Args:
-        regency_id: The unique identifier of the regency
+    This endpoint calculates health access scores based on the proportion of the
+    population living outside a defined service radius of the nearest health facility.
+    The data can be used to generate a heatmap visualization showing areas with
+    poor health access.
     """
     try:
-        # Validate regency exists
+        # Validate that the regency exists
         regency = await analysis_service.get_regency_by_id(regency_id)
         if not regency:
             raise NotFoundException(f"Regency with ID {regency_id} not found")
@@ -68,23 +64,18 @@ async def get_priority_score(
     current_user: UserSchema = Depends(get_current_user_required)
 ) -> PriorityScoreData:
     """
-    Get equity prioritization score for a specific regency.
+    Get equity prioritization score data for a specific regency.
     
-    This endpoint delivers the "Equity Prioritization Score" by returning a ranked
-    list of sub-districts based on a composite score that considers:
-    
+    This endpoint returns a ranked list of sub-districts based on a composite score
+    that considers three factors:
     - Gap Factor: Measures the gap in health service access
     - Efficiency Factor: Evaluates the efficiency of current health infrastructure
     - Vulnerability Factor: Assesses the vulnerability of the population
     
-    The composite score helps prioritize areas that need the most attention
-    for health infrastructure development and improvement.
-    
-    Args:
-        regency_id: The unique identifier of the regency
+    The results help prioritize areas for health infrastructure investment.
     """
     try:
-        # Validate regency exists
+        # Validate that the regency exists
         regency = await analysis_service.get_regency_by_id(regency_id)
         if not regency:
             raise NotFoundException(f"Regency with ID {regency_id} not found")
@@ -100,4 +91,46 @@ async def get_priority_score(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate priority score data: {str(e)}"
+        )
+
+@analysis_router.get(
+    "/subdistrict-details",
+    response_model=SubDistrictDetails,
+    summary="Get Sub-district Details",
+    description="Retrieve detailed statistics for a specific sub-district including population, area, poverty rate, existing facilities, and calculated scores."
+)
+async def get_subdistrict_details(
+    subdistrict_id: str = Query(..., description="ID of the sub-district for detailed analysis"),
+    current_user: UserSchema = Depends(get_current_user_required)
+) -> SubDistrictDetails:
+    """
+    Get detailed statistics for a specific sub-district.
+    
+    This endpoint provides comprehensive information about a sub-district including:
+    - Population and demographic data
+    - Geographic information (area, population density)
+    - Socioeconomic indicators (poverty rate)
+    - Existing health facilities
+    - Calculated priority scores
+    
+    This data is useful when users click on a specific sub-district on the map
+    or in the priority list to get detailed information.
+    """
+    try:
+        # Validate that the sub-district exists
+        subdistrict = await analysis_service.get_subdistrict_by_id(subdistrict_id)
+        if not subdistrict:
+            raise NotFoundException(f"Sub-district with ID {subdistrict_id} not found")
+        
+        details = await analysis_service.get_subdistrict_details(subdistrict_id)
+        return details
+    except NotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve sub-district details: {str(e)}"
         ) 

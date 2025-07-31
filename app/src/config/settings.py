@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, field_validator
+from typing import List
 
 class Settings(BaseSettings):
     # Supabase configuration
@@ -29,6 +30,14 @@ class Settings(BaseSettings):
     app_port: int = Field(..., alias="APP_PORT")
     frontend_url: str = Field(..., alias="FRONTEND_URL")
     backend_url: str = Field(..., alias="BACKEND_URL")
+    allowed_origins: str = Field(..., alias="ALLOWED_ORIGINS")
+
+    @field_validator('allowed_origins')
+    @classmethod
+    def parse_allowed_origins(cls, v: str) -> List[str]:
+        if v.strip() == "*":
+            return ["*"]
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
 
     class Config:
         env_file = ".env"

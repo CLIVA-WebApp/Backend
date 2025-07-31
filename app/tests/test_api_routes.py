@@ -16,6 +16,14 @@ class TestRegionRoutes:
         """Test that regencies endpoint requires authentication"""
         response = client.get("/api/v1/regions/regencies?province_id=32")
         assert response.status_code == 401
+    
+    def test_get_subdistricts_unauthorized(self):
+        response = client.get("/api/v1/regions/subdistricts?regency_id=3201")
+        assert response.status_code == 401
+    
+    def test_get_facilities_unauthorized(self):
+        response = client.get("/api/v1/regions/facilities?regency_id=3201")
+        assert response.status_code == 401
 
 class TestAnalysisRoutes:
     """Test cases for analysis-related endpoints"""
@@ -28,6 +36,10 @@ class TestAnalysisRoutes:
     def test_get_priority_score_unauthorized(self):
         """Test that priority score endpoint requires authentication"""
         response = client.get("/api/v1/analysis/priority-score?regency_id=3201")
+        assert response.status_code == 401
+    
+    def test_get_subdistrict_details_unauthorized(self):
+        response = client.get("/api/v1/analysis/subdistrict-details?subdistrict_id=320101")
         assert response.status_code == 401
 
 class TestSimulationRoutes:
@@ -42,6 +54,28 @@ class TestSimulationRoutes:
             "optimization_criteria": ["population_coverage", "cost_efficiency"]
         }
         response = client.post("/api/v1/simulation/run", json=simulation_data)
+        assert response.status_code == 401
+
+class TestReportsRoutes:
+    """Test cases for report-related endpoints"""
+    
+    def test_export_report_unauthorized(self):
+        """Test that report export endpoint requires authentication"""
+        report_data = {
+            "report_type": "simulation_results",
+            "data": {
+                "regency_id": "3201",
+                "regency_name": "Kabupaten Bogor",
+                "total_budget": 10000000,
+                "budget_used": 8500000,
+                "facilities_recommended": 2,
+                "total_population_covered": 25000,
+                "coverage_percentage": 50.0,
+                "optimized_facilities": []
+            },
+            "format": "csv"
+        }
+        response = client.post("/api/v1/reports/export", json=report_data)
         assert response.status_code == 401
 
 class TestAPIStructure:

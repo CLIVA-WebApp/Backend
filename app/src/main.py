@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -8,28 +8,29 @@ from app.src.views.auth_view import auth_router
 from app.src.views.region_view import region_router
 from app.src.views.analysis_view import analysis_router
 from app.src.views.simulation_view import simulation_router
+from app.src.views.reports_view import reports_router
 from app.src.utils.exceptions import (
     AuthenticationException, 
     DatabaseException, 
-    ValidationException, 
+    ValidationException,
     NotFoundException
 )
 
-# Create FastAPI application
+# Create FastAPI app instance
 app = FastAPI(
-    title="Google OAuth with Supabase API",
-    description="FastAPI application with Google OAuth authentication using Supabase",
+    title="Health Access Analysis and Optimization API",
+    description="API for analyzing health access patterns and optimizing facility placement in Indonesia",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# Add CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -38,31 +39,32 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(region_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
 app.include_router(simulation_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
 
 # Global exception handlers
 @app.exception_handler(AuthenticationException)
-async def authentication_exception_handler(request, exc):
+async def authentication_exception_handler(request: Request, exc: AuthenticationException):
     return JSONResponse(
         status_code=401,
         content={"detail": str(exc), "type": "authentication_error"}
     )
 
 @app.exception_handler(DatabaseException)
-async def database_exception_handler(request, exc):
+async def database_exception_handler(request: Request, exc: DatabaseException):
     return JSONResponse(
         status_code=500,
-        content={"detail": "Database operation failed", "type": "database_error"}
+        content={"detail": str(exc), "type": "database_error"}
     )
 
 @app.exception_handler(ValidationException)
-async def validation_exception_handler(request, exc):
+async def validation_exception_handler(request: Request, exc: ValidationException):
     return JSONResponse(
         status_code=422,
         content={"detail": str(exc), "type": "validation_error"}
     )
 
 @app.exception_handler(NotFoundException)
-async def not_found_exception_handler(request, exc):
+async def not_found_exception_handler(request: Request, exc: NotFoundException):
     return JSONResponse(
         status_code=404,
         content={"detail": str(exc), "type": "not_found_error"}
@@ -71,13 +73,13 @@ async def not_found_exception_handler(request, exc):
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "Google OAuth API"}
+    return {"status": "healthy", "message": "API is running"}
 
 # Root endpoint
 @app.get("/")
 async def root():
     return {
-        "message": "Google OAuth with Supabase API",
+        "message": "Health Access Analysis and Optimization API",
         "version": "1.0.0",
         "docs": "/docs"
     }
