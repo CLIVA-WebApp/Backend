@@ -5,6 +5,9 @@ import uvicorn
 
 from app.src.config.settings import settings
 from app.src.views.auth_view import auth_router
+from app.src.views.region_view import region_router
+from app.src.views.analysis_view import analysis_router
+from app.src.views.simulation_view import simulation_router
 from app.src.utils.exceptions import (
     AuthenticationException, 
     DatabaseException, 
@@ -32,6 +35,9 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(region_router, prefix="/api/v1")
+app.include_router(analysis_router, prefix="/api/v1")
+app.include_router(simulation_router, prefix="/api/v1")
 
 # Global exception handlers
 @app.exception_handler(AuthenticationException)
