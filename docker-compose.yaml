@@ -1,0 +1,40 @@
+services:
+  cliva_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cliva-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Server Configuration
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - DEBUG=False
+      - APP_ENV=development
+      - ALLOWED_ORIGINS="*"
+      
+      # JWT Configuration
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      
+      # App URLs
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:8000}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+    restart: unless-stopped
+    networks:
+      - health-access-network
+    # depends_on:
+    #   - postgres
+
+networks:
+  health-access-network:
+    driver: bridge 

@@ -81,6 +81,11 @@ class UserService:
     async def create_user(self, user_data: Dict[str, Any]) -> UserSchema:
         """Create a new user in database"""
         try:
+            # Generate UUID for user ID if not provided
+            if "id" not in user_data:
+                import uuid
+                user_data["id"] = str(uuid.uuid4())
+            
             # Add timestamps
             user_data["created_at"] = datetime.utcnow().isoformat()
             user_data["updated_at"] = datetime.utcnow().isoformat()
