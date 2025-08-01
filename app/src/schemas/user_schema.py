@@ -1,10 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, Index
-from sqlalchemy.sql import func
-from app.src.config.database import Base
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 from datetime import datetime
 from enum import Enum as PydanticEnum
+import uuid
 
 # Pydantic Models for API Schemas
 class UserProviderEnum(str, PydanticEnum):
@@ -12,11 +10,15 @@ class UserProviderEnum(str, PydanticEnum):
     EMAIL = "email"
 
 class UserSchema(BaseModel):
-    id: Optional[str] = None
+    id: Optional[uuid.UUID] = None
     email: Optional[str] = None
     username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     provider: Optional[str] = None
     provider_id: Optional[str] = None
+    location_geom: Optional[str] = None  # WKT format for geometry
+    location_address: Optional[str] = None
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -24,7 +26,8 @@ class UserSchema(BaseModel):
     class Config:
         from_attributes = True
         json_encoders = {
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat(),
+            uuid.UUID: lambda v: str(v)
         }
 
 class UserSchemaWithPassword(UserSchema):
@@ -38,6 +41,8 @@ class UserInDB(UserSchema):
 class UserRegister(BaseModel):
     email: EmailStr
     username: str
+    first_name: str
+    last_name: str
     password: str
     
     @validator('password')
@@ -50,6 +55,16 @@ class UserRegister(BaseModel):
             raise ValueError('Password must contain at least one lowercase letter')
         if not any(c.isdigit() for c in v):
             raise ValueError('Password must contain at least one digit')
+        return v
+
+class UserLocationUpdate(BaseModel):
+    """Schema for updating user location"""
+    location_address: Optional[str] = None
+    
+    @validator('location_address')
+    def validate_location_address(cls, v):
+        if v is not None and len(v.strip()) < 5:
+            raise ValueError('Address must be at least 5 characters long')
         return v
 
 class UserLogin(BaseModel):

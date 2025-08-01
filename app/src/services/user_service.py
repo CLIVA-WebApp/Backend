@@ -1,9 +1,10 @@
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from supabase import create_client, Client
 from app.src.config.settings import settings
 from app.src.schemas.user_schema import UserSchema, UserSchemaWithPassword
 from app.src.utils.exceptions import DatabaseException
+from app.src.services.geocoding_service import GeocodingService
 
 class UserService:
     def __init__(self):
@@ -12,6 +13,7 @@ class UserService:
             settings.supabase_url,
             settings.supabase_service_key  # Changed from anon_key
         )
+        self.geocoding_service = GeocodingService()
     
     async def get_user_by_email(self, email: str) -> Optional[UserSchema]:
         """Get user by email from database"""
@@ -138,6 +140,43 @@ class UserService:
         except Exception as e:
             raise DatabaseException(f"Error updating password: {str(e)}")
     
+    async def update_user_location(self, user_id: str, location_data: dict) -> UserSchema:
+        """Update user location with automatic geocoding"""
+        try:
+            update_data = {
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # If address is provided, geocode it to get coordinates
+            if "location_address" in location_data and location_data["location_address"]:
+                address = location_data["location_address"]
+                
+                # Geocode the address
+                geocoding_result = await self.geocoding_service.geocode_address(address)
+                
+                if geocoding_result:
+                    # Update with both address and geometry
+                    update_data["location_address"] = address
+                    update_data["location_geom"] = geocoding_result["wkt_point"]
+                else:
+                    # If geocoding fails, still save the address but log warning
+                    update_data["location_address"] = address
+                    # location_geom will remain null
+            elif "location_geom" in location_data and location_data["location_geom"]:
+                # If geometry is directly provided (for advanced use cases)
+                update_data["location_geom"] = location_data["location_geom"]
+            
+            result = self.supabase.table("users").update(update_data).eq("id", user_id).execute()
+            
+            if result.data:
+                updated_user = result.data[0]
+                return UserSchema(**updated_user)
+            else:
+                raise DatabaseException("Failed to update user location")
+                
+        except Exception as e:
+            raise DatabaseException(f"Error updating user location: {str(e)}")
+    
     async def create_or_update_user(self, user_data: Dict[str, Any]) -> UserSchema:
         """Create user if doesn't exist, otherwise update existing user"""
         print(f"create_or_update_user called with: {user_data}")  # Debug logging
@@ -150,6 +189,8 @@ class UserService:
             update_data = {
                 "username": user_data.get("username", existing_user.username),
                 "email": user_data.get("email", existing_user.email),
+                "first_name": user_data.get("first_name", existing_user.first_name),
+                "last_name": user_data.get("last_name", existing_user.last_name),
                 "provider": user_data.get("provider", existing_user.provider),
                 "provider_id": user_data.get("provider_id", existing_user.provider_id),
                 "is_active": user_data.get("is_active", existing_user.is_active)
@@ -172,3 +213,30 @@ class UserService:
             
         except Exception as e:
             raise DatabaseException(f"Error deactivating user: {str(e)}")
+    
+    async def find_users_by_proximity(self, center_lat: float, center_lng: float, radius_km: float = 10.0) -> List[UserSchema]:
+        """Find users within a specified radius of a point"""
+        try:
+            # Convert radius from km to degrees (approximate)
+            radius_degrees = radius_km / 111.0  # Rough conversion
+            
+            # Create a bounding box for the search area
+            min_lat = center_lat - radius_degrees
+            max_lat = center_lat + radius_degrees
+            min_lng = center_lng - radius_degrees
+            max_lng = center_lng + radius_degrees
+            
+            # Query users within the bounding box
+            result = self.supabase.table("users").select("*").execute()
+            
+            users = []
+            for user_data in result.data:
+                if user_data.get("location_geom"):
+                    # For now, we'll return all users with location data
+                    # In a real implementation, you'd use PostGIS spatial functions
+                    users.append(UserSchema(**user_data))
+            
+            return users
+            
+        except Exception as e:
+            raise DatabaseException(f"Error finding users by proximity: {str(e)}")

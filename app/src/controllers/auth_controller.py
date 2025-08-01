@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi.responses import RedirectResponse
 from app.src.config.settings import settings
 from app.src.services.auth_service import AuthService
-from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
+from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange, UserLocationUpdate
 from app.src.middleware.auth_middleware import get_current_user_required
 from app.src.utils.exceptions import AuthenticationException
 from app.src.schemas.auth_schema import (
@@ -71,6 +71,9 @@ class AuthController:
                     "id": str(user.id),
                     "email": user.email,
                     "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "location_address": user.location_address,
                     "is_active": user.is_active
                 }
             }
@@ -107,6 +110,9 @@ class AuthController:
                     "id": str(user.id),
                     "email": user.email,
                     "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "location_address": user.location_address,
                     "is_active": user.is_active
                 }
             }
@@ -143,6 +149,9 @@ class AuthController:
                     "id": str(user.id),
                     "email": user.email,
                     "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "location_address": user.location_address,
                     "is_active": user.is_active
                 }
             }
@@ -192,11 +201,53 @@ class AuthController:
         return UserResponse(
             id=str(current_user.id),
             email=current_user.email,
-            full_name=current_user.username,  # Use username as full_name
+            full_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.username,
             avatar_url=None,  # Not available in current schema
             provider="google",  # Default to google for OAuth users
             is_active=current_user.is_active
         )
+    
+    async def update_user_location(
+        self, 
+        location_data: UserLocationUpdate,
+        current_user: UserSchema = Depends(get_current_user_required)
+    ) -> dict:
+        """Update user location with automatic geocoding"""
+        try:
+            # Convert location data to dict, excluding None values
+            location_dict = {}
+            if location_data.location_address is not None:
+                location_dict["location_address"] = location_data.location_address
+            
+            updated_user = await self.auth_service.update_user_location(str(current_user.id), location_dict)
+            
+            # Determine if geocoding was successful
+            geocoding_success = updated_user.location_geom is not None
+            
+            return {
+                "message": "Location updated successfully" + (" (coordinates found)" if geocoding_success else " (address saved, coordinates not found)"),
+                "user": {
+                    "id": str(updated_user.id),
+                    "email": updated_user.email,
+                    "username": updated_user.username,
+                    "first_name": updated_user.first_name,
+                    "last_name": updated_user.last_name,
+                    "location_address": updated_user.location_address,
+                    "has_coordinates": geocoding_success,
+                    "is_active": updated_user.is_active
+                }
+            }
+        
+        except AuthenticationException as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Location update failed: {str(e)}"
+            )
 
 # Create controller instance
 auth_controller = AuthController()

@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from typing import Optional, Dict, Any
 from app.src.config.settings import settings
 from app.src.controllers.auth_controller import auth_controller
-from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange
+from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange, UserLocationUpdate
 from app.src.middleware.auth_middleware import get_current_user_required
 from app.src.schemas.auth_schema import (
     GoogleAuthResponse, 
@@ -79,3 +79,11 @@ async def get_current_user_profile(
 async def logout(response: Response):
     """Logout user by clearing session cookie"""
     return await auth_controller.logout(response)
+
+@auth_router.put("/location", summary="Update User Location")
+async def update_user_location(
+    location_data: UserLocationUpdate,
+    current_user: UserSchema = Depends(get_current_user_required)
+):
+    """Update user location (address and/or geometry)"""
+    return await auth_controller.update_user_location(location_data, current_user)

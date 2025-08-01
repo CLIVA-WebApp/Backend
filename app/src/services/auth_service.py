@@ -55,12 +55,28 @@ class AuthService:
             supabase_user = auth_response.user
             
             # Extract user data from OAuth response
+            full_name = supabase_user.user_metadata.get("full_name") or supabase_user.user_metadata.get("name") or ""
+            
+            # Extract first and last name from full name
+            name_parts = full_name.strip().split()
+            if len(name_parts) >= 2:
+                first_name = name_parts[0]
+                last_name = " ".join(name_parts[1:])
+            elif len(name_parts) == 1:
+                first_name = name_parts[0]
+                last_name = ""
+            else:
+                first_name = ""
+                last_name = ""
+            
             user_data = {
                 "email": supabase_user.email,
-                "username": supabase_user.user_metadata.get("full_name") or supabase_user.user_metadata.get("name"),
+                "username": full_name,
+                "first_name": first_name,
+                "last_name": last_name,
                 "provider": UserProvider.GOOGLE,
                 "provider_id": supabase_user.id,
-                "is_active": True  # Add this line to set is_active to True
+                "is_active": True
             }
             
             # Create or update user in our database
@@ -99,6 +115,8 @@ class AuthService:
             user_create_data = {
                 "email": user_data.email,
                 "username": user_data.username,
+                "first_name": user_data.first_name,
+                "last_name": user_data.last_name,
                 "hashed_password": hashed_password,
                 "provider": UserProvider.EMAIL,
                 "is_active": True
@@ -205,3 +223,10 @@ class AuthService:
             return None
             
         return await self.user_service.get_user_by_email(email)
+    
+    async def update_user_location(self, user_id: str, location_data: dict) -> UserSchema:
+        """Update user location"""
+        try:
+            return await self.user_service.update_user_location(user_id, location_data)
+        except Exception as e:
+            raise AuthenticationException(f"Failed to update user location: {str(e)}")

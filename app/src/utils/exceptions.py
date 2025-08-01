@@ -13,3 +13,7 @@ class ValidationException(Exception):
 class NotFoundException(Exception):
     """Raised when requested resource is not found"""
     pass
+
+class GeocodingException(Exception):
+    """Raised when geocoding operations fail"""
+    pass
