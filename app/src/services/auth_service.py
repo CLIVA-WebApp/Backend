@@ -67,7 +67,7 @@ class AuthService:
             user = await self.user_service.create_or_update_user(user_data)
             
             # Generate our own JWT token
-            jwt_token = self.create_access_token({"sub": user.email, "user_id": user.id})
+            jwt_token = self.create_access_token({"sub": user.email, "user_id": str(user.id)})
             
             return user, jwt_token
             
@@ -108,7 +108,7 @@ class AuthService:
             user = await self.user_service.create_user(user_create_data)
             
             # Generate JWT token
-            jwt_token = self.create_access_token({"sub": user.email, "user_id": user.id})
+            jwt_token = self.create_access_token({"sub": user.email, "user_id": str(user.id)})
             
             return user, jwt_token
             
@@ -138,7 +138,7 @@ class AuthService:
                 raise AuthenticationException("Account is deactivated")
             
             # Generate JWT token
-            jwt_token = self.create_access_token({"sub": user.email, "user_id": user.id})
+            jwt_token = self.create_access_token({"sub": user.email, "user_id": str(user.id)})
             
             return user, jwt_token
             
@@ -147,7 +147,7 @@ class AuthService:
         except Exception as e:
             raise AuthenticationException(f"Login failed: {str(e)}")
     
-    async def change_password(self, user_id: int, current_password: str, new_password: str) -> bool:
+    async def change_password(self, user_id: str, current_password: str, new_password: str) -> bool:
         """Change user password"""
         try:
             # Get user with password for verification

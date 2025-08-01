@@ -68,7 +68,7 @@ class AuthController:
             
             return {
                 "user": {
-                    "id": user.id,
+                    "id": str(user.id),
                     "email": user.email,
                     "username": user.username,
                     "is_active": user.is_active
@@ -104,7 +104,7 @@ class AuthController:
             return {
                 "message": "Registration successful",
                 "user": {
-                    "id": user.id,
+                    "id": str(user.id),
                     "email": user.email,
                     "username": user.username,
                     "is_active": user.is_active
@@ -140,7 +140,7 @@ class AuthController:
             return {
                 "message": "Login successful",
                 "user": {
-                    "id": user.id,
+                    "id": str(user.id),
                     "email": user.email,
                     "username": user.username,
                     "is_active": user.is_active
@@ -166,7 +166,7 @@ class AuthController:
         """Change user password"""
         try:
             success = await self.auth_service.change_password(
-                current_user.id,
+                str(current_user.id),
                 password_data.current_password,
                 password_data.new_password
             )

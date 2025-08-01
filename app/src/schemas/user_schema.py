@@ -12,7 +12,7 @@ class UserProviderEnum(str, PydanticEnum):
     EMAIL = "email"
 
 class UserSchema(BaseModel):
-    id: Optional[int] = None
+    id: Optional[str] = None
     email: Optional[str] = None
     username: Optional[str] = None
     provider: Optional[str] = None

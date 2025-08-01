@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from app.src.schemas.analysis_schema import (
     HeatmapData,
     HeatmapPoint,
@@ -24,7 +24,7 @@ class AnalysisService:
     def __init__(self):
         self.db: Session = SessionLocal()
     
-    async def get_regency_by_id(self, regency_id: UUID) -> Optional[RegencySchema]:
+    async def get_regency_by_id(self, regency_id: Union[UUID, str]) -> Optional[RegencySchema]:
         """
         Get a specific regency by ID.
         """
@@ -63,7 +63,7 @@ class AnalysisService:
             logger.error(f"Error retrieving regency {regency_id}: {str(e)}")
             raise
     
-    async def get_subdistrict_by_id(self, subdistrict_id: UUID) -> Optional[SubDistrictSchema]:
+    async def get_subdistrict_by_id(self, subdistrict_id: Union[UUID, str]) -> Optional[SubDistrictSchema]:
         """
         Get a specific sub-district by ID.
         """
@@ -106,7 +106,7 @@ class AnalysisService:
             logger.error(f"Error retrieving sub-district {subdistrict_id}: {str(e)}")
             raise
     
-    async def get_facilities_by_subdistrict(self, subdistrict_id: UUID) -> List[FacilitySchema]:
+    async def get_facilities_by_subdistrict(self, subdistrict_id: Union[UUID, str]) -> List[FacilitySchema]:
         """
         Get all health facilities within a specific sub-district.
         """
@@ -163,16 +163,11 @@ class AnalysisService:
             logger.error(f"Error retrieving facilities for sub-district {subdistrict_id}: {str(e)}")
             raise
     
-    async def generate_heatmap_data(self, regency_id: UUID) -> HeatmapData:
+    async def generate_heatmap_data(self, regency_id: Union[UUID, str]) -> HeatmapData:
         """
         Generate heatmap data for a specific regency.
         """
         try:
-            # Get regency info
-            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
-            if not regency:
-                raise ValueError(f"Regency with ID {regency_id} not found")
-            
             # Check if this is a mock request
             if str(regency_id) == "mock":
                 mock_heatmap_data = HeatmapData(
@@ -199,6 +194,11 @@ class AnalysisService:
                     ]
                 )
                 return mock_heatmap_data
+            
+            # Get regency info for real data
+            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
+            if not regency:
+                raise ValueError(f"Regency with ID {regency_id} not found")
             
             # Mock heatmap generation for now
             # In reality, this would involve complex spatial analysis
@@ -235,16 +235,11 @@ class AnalysisService:
             logger.error(f"Error generating heatmap data for regency {regency_id}: {str(e)}")
             raise
     
-    async def generate_priority_score_data(self, regency_id: UUID) -> PriorityScoreData:
+    async def generate_priority_score_data(self, regency_id: Union[UUID, str]) -> PriorityScoreData:
         """
         Generate priority score data for a specific regency.
         """
         try:
-            # Get regency info
-            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
-            if not regency:
-                raise ValueError(f"Regency with ID {regency_id} not found")
-            
             # Check if this is a mock request
             if str(regency_id) == "mock":
                 mock_priority_data = PriorityScoreData(
@@ -273,6 +268,11 @@ class AnalysisService:
                     ]
                 )
                 return mock_priority_data
+            
+            # Get regency info for real data
+            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
+            if not regency:
+                raise ValueError(f"Regency with ID {regency_id} not found")
             
             # Mock priority score generation for now
             # In reality, this would involve complex calculations
@@ -317,16 +317,11 @@ class AnalysisService:
             logger.error(f"Error generating priority score data for regency {regency_id}: {str(e)}")
             raise
     
-    async def get_subdistrict_details(self, subdistrict_id: UUID) -> SubDistrictDetails:
+    async def get_subdistrict_details(self, subdistrict_id: Union[UUID, str]) -> SubDistrictDetails:
         """
         Get detailed statistics for a specific sub-district.
         """
         try:
-            # Get sub-district info
-            subdistrict = self.db.query(Subdistrict).filter(Subdistrict.id == subdistrict_id).first()
-            if not subdistrict:
-                raise ValueError(f"Sub-district with ID {subdistrict_id} not found")
-            
             # Check if this is a mock request
             if str(subdistrict_id) == "mock":
                 mock_details = SubDistrictDetails(
@@ -360,6 +355,11 @@ class AnalysisService:
                     rank=1
                 )
                 return mock_details
+            
+            # Get sub-district info for real data
+            subdistrict = self.db.query(Subdistrict).filter(Subdistrict.id == subdistrict_id).first()
+            if not subdistrict:
+                raise ValueError(f"Sub-district with ID {subdistrict_id} not found")
             
             # Get facilities for this sub-district
             facilities = self.db.query(HealthFacility).filter(HealthFacility.sub_district_id == subdistrict_id).all()

@@ -52,7 +52,7 @@ class UserService:
         except Exception as e:
             raise DatabaseException(f"Error fetching user: {str(e)}")
     
-    async def get_user_by_id(self, user_id: int) -> Optional[UserSchema]:
+    async def get_user_by_id(self, user_id: str) -> Optional[UserSchema]:
         """Get user by ID from database"""
         try:
             result = self.supabase.table("users").select("*").eq("id", user_id).execute()
@@ -65,7 +65,7 @@ class UserService:
         except Exception as e:
             raise DatabaseException(f"Error fetching user: {str(e)}")
     
-    async def get_user_by_id_with_password(self, user_id: int) -> Optional[UserSchemaWithPassword]:
+    async def get_user_by_id_with_password(self, user_id: str) -> Optional[UserSchemaWithPassword]:
         """Get user by ID from database with hashed_password for password changes"""
         try:
             result = self.supabase.table("users").select("*").eq("id", user_id).execute()
@@ -108,7 +108,7 @@ class UserService:
             print(f"Error creating user: {str(e)}")  # Debug logging
             raise DatabaseException(f"Error creating user: {str(e)}")
     
-    async def update_user(self, user_id: int, user_data: Dict[str, Any]) -> UserSchema:
+    async def update_user(self, user_id: str, user_data: Dict[str, Any]) -> UserSchema:
         """Update existing user in database"""
         try:
             # Add updated timestamp
@@ -125,7 +125,7 @@ class UserService:
         except Exception as e:
             raise DatabaseException(f"Error updating user: {str(e)}")
     
-    async def update_user_password(self, user_id: int, hashed_password: str) -> bool:
+    async def update_user_password(self, user_id: str, hashed_password: str) -> bool:
         """Update user password"""
         try:
             result = self.supabase.table("users").update({
@@ -154,13 +154,13 @@ class UserService:
                 "provider_id": user_data.get("provider_id", existing_user.provider_id),
                 "is_active": user_data.get("is_active", existing_user.is_active)
             }
-            return await self.update_user(existing_user.id, update_data)
+            return await self.update_user(str(existing_user.id), update_data)
         else:
             print(f"User doesn't exist, creating new user for: {user_data['email']}")  # Debug logging
             # Create new user
             return await self.create_user(user_data)
     
-    async def deactivate_user(self, user_id: int) -> bool:
+    async def deactivate_user(self, user_id: str) -> bool:
         """Deactivate user account"""
         try:
             result = self.supabase.table("users").update({
