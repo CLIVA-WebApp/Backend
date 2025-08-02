@@ -196,7 +196,69 @@
 
 **Endpoint**: `POST /api/v1/simulation/run`
 
-**Description**: Run a greedy simulation for healthcare facility placement optimization.
+**Description**: Run a simulation for healthcare facility placement optimization with multiple areas and facility types.
+
+**Request Body**:
+```json
+{
+  "geographic_level": "subdistrict",
+  "area_ids": [
+    "dcedb737-b775-48af-8a30-72149300d54c",
+    "0cfe84ee-adaf-4ac7-b486-b2f96e07d4ab"
+  ],
+  "budget": 15000000000,
+  "facility_types": [
+    "Hospital",
+    "Clinic"
+  ]
+}
+```
+
+**Geographic Levels**:
+- `"province"`: Area IDs are province IDs
+- `"regency"`: Area IDs are regency/city IDs  
+- `"subdistrict"`: Area IDs are subdistrict IDs
+
+**Response**:
+```json
+{
+  "simulation_summary": {
+    "initial_coverage": 65.2,
+    "projected_coverage": 81.5,
+    "coverage_increase_percent": 16.3,
+    "total_cost": 14500000000,
+    "budget_remaining": 500000000
+  },
+  "recommendations": [
+    {
+      "type": "Hospital",
+      "subdistrict_id": "dcedb737-b775-48af-8a30-72149300d54c",
+      "location_name": "Kecamatan Kebayoran Baru",
+      "coordinates": {
+        "lat": -6.2088,
+        "lon": 106.8456
+      },
+      "estimated_cost": 10000000000
+    },
+    {
+      "type": "Clinic",
+      "subdistrict_id": "0cfe84ee-adaf-4ac7-b486-b2f96e07d4ab",
+      "location_name": "Kecamatan Kebayoran Lama",
+      "coordinates": {
+        "lat": -6.2233,
+        "lon": 106.8333
+      },
+      "estimated_cost": 4500000000
+    }
+  ]
+}
+```
+
+### Run Legacy Simulation
+
+**Endpoint**: `POST /api/v1/simulation/run-legacy`
+
+**Description**: Legacy simulation endpoint for backward compatibility. Runs a greedy algorithm to optimize healthcare facility placement within a given regency.
 
 **Request Body**:
 ```json
@@ -216,7 +278,7 @@
   "facilities_recommended": 3,
   "total_population_covered": 150000,
   "coverage_percentage": 75.5,
-  "automated_reasoning": "The greedy algorithm analyzed Jakarta Selatan and allocated 4,500,000,000 IDR (90.0% of total budget) to recommend 3 facilities, achieving 75.5% population coverage for 150,000 people. The algorithm prioritized cost-effectiveness by recommending 2 Puskesmas and 1 Pustu facilities based on population density and coverage gaps in underserved areas.",
+  "automated_reasoning": "The greedy algorithm analyzed Jakarta Selatan and allocated 4,500,000,000 IDR to recommend 3 facilities, achieving 75.5% population coverage with a 16.3% increase.",
   "optimized_facilities": [
     {
       "latitude": -6.2088,
