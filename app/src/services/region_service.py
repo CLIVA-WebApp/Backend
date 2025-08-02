@@ -209,16 +209,26 @@ class RegionService:
                 ]
                 return mock_facilities
             
-            facilities = self.db.query(HealthFacility).filter(HealthFacility.regency_id == regency_id).all()
+            facilities = self.db.query(HealthFacility).join(Subdistrict).filter(Subdistrict.regency_id == regency_id).all()
             
             facility_schemas = []
             for facility in facilities:
+                # Extract coordinates from geometry
+                coords_query = text("""
+                    SELECT 
+                        ST_X(geom) as longitude,
+                        ST_Y(geom) as latitude
+                    FROM health_facilities 
+                    WHERE id = :facility_id
+                """)
+                coords_result = self.db.execute(coords_query, {"facility_id": facility.id}).first()
+                
                 facility_schemas.append(FacilitySchema(
                     id=facility.id,
                     name=facility.name,
-                    type=facility.facility_type,
-                    latitude=facility.latitude,
-                    longitude=facility.longitude,
+                    type=facility.type.value if hasattr(facility.type, 'value') else str(facility.type),
+                    latitude=coords_result.latitude if coords_result else 0.0,
+                    longitude=coords_result.longitude if coords_result else 0.0,
                     regency_id=facility.sub_district.regency_id if hasattr(facility, 'sub_district') and facility.sub_district else None,
                     regency_name=facility.sub_district.regency.name if hasattr(facility, 'sub_district') and facility.sub_district and hasattr(facility.sub_district, 'regency') and facility.sub_district.regency else None,
                     sub_district_id=facility.subdistrict_id,

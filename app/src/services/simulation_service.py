@@ -65,29 +65,41 @@ class SimulationService:
             SimulationResult with optimized facility recommendations
         """
         try:
+            print(f"Starting simulation for regency {regency_id} with budget {budget}")
+            
             # Check if this is a mock request
             if str(regency_id) == "mock":
+                print("Using mock simulation result")
                 return self._generate_mock_simulation_result(budget)
             
             # Get regency info
+            print(f"Getting regency info for {regency_id}")
             regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
             if not regency:
                 raise ValueError(f"Regency with ID {regency_id} not found")
+            print(f"Found regency: {regency.name}")
             
             # Get all population points in the regency
+            print("Getting population points...")
             population_points = self._get_population_points(regency_id)
+            print(f"Found {len(population_points)} population points")
             if not population_points:
                 raise ValueError(f"No population points found for regency {regency_id}")
             
             # Get existing health facilities
+            print("Getting existing facilities...")
             existing_facilities = self._get_existing_facilities(regency_id)
+            print(f"Found {len(existing_facilities)} existing facilities")
             
             # Identify underserved population points
+            print("Identifying underserved points...")
             underserved_points = self._identify_underserved_points(
                 population_points, existing_facilities
             )
+            print(f"Found {len(underserved_points)} underserved points")
             
             if not underserved_points:
+                print("No underserved points found, returning empty result")
                 return SimulationResult(
                     regency_id=regency_id,
                     regency_name=regency.name,
@@ -100,16 +112,21 @@ class SimulationService:
                 )
             
             # Cluster underserved points to find candidate locations
+            print("Clustering population points...")
             candidate_locations = self._cluster_population_points(underserved_points)
+            print(f"Found {len(candidate_locations)} candidate locations")
             
             # Run greedy algorithm
+            print("Running greedy algorithm...")
             optimized_facilities, budget_used, total_covered = self._run_greedy_algorithm(
                 candidate_locations, underserved_points, budget
             )
+            print(f"Algorithm completed: {len(optimized_facilities)} facilities recommended")
             
             # Calculate coverage percentage
             total_population = sum(point['population_count'] for point in population_points)
             coverage_percentage = (total_covered / total_population * 100) if total_population > 0 else 0
+            print(f"Coverage percentage: {coverage_percentage:.2f}%")
             
             return SimulationResult(
                 regency_id=regency_id,
@@ -123,7 +140,9 @@ class SimulationService:
             )
             
         except Exception as e:
-            logger.error(f"Error running simulation for regency {regency_id}: {str(e)}")
+            print(f"Error running simulation for regency {regency_id}: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             raise
     
     def _get_population_points(self, regency_id: Union[UUID, str]) -> List[Dict[str, Any]]:
@@ -222,10 +241,15 @@ class SimulationService:
         if n_clusters == 1:
             # If only one cluster, use the centroid of all points
             centroid = np.mean(coordinates, axis=0)
+            # Get the most common subdistrict_id from the points
+            subdistrict_ids = [p.get('subdistrict_id') for p in points if p.get('subdistrict_id')]
+            most_common_subdistrict_id = max(set(subdistrict_ids), key=subdistrict_ids.count) if subdistrict_ids else None
+            
             return [{
                 'latitude': centroid[0],
                 'longitude': centroid[1],
-                'population_count': sum(p['population_count'] for p in points)
+                'population_count': sum(p['population_count'] for p in points),
+                'subdistrict_id': most_common_subdistrict_id
             }]
         
         # Perform K-means clustering
@@ -238,10 +262,15 @@ class SimulationService:
             cluster_points = [p for j, p in enumerate(points) if cluster_labels[j] == i]
             centroid = kmeans.cluster_centers_[i]
             
+            # Get the most common subdistrict_id from the cluster points
+            subdistrict_ids = [p.get('subdistrict_id') for p in cluster_points if p.get('subdistrict_id')]
+            most_common_subdistrict_id = max(set(subdistrict_ids), key=subdistrict_ids.count) if subdistrict_ids else None
+            
             candidates.append({
                 'latitude': centroid[0],
                 'longitude': centroid[1],
                 'population_count': sum(p['population_count'] for p in cluster_points),
+                'subdistrict_id': most_common_subdistrict_id,
                 'cluster_points': cluster_points
             })
         
@@ -363,6 +392,20 @@ class SimulationService:
         # Earth's radius in meters
         r = 6371000
         return c * r
+    
+    async def get_regency_by_id(self, regency_id: Union[UUID, str]):
+        """Get regency by ID."""
+        try:
+            print(f"Getting regency by ID: {regency_id}")
+            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
+            if regency:
+                print(f"Found regency: {regency.name}")
+            else:
+                print(f"Regency not found: {regency_id}")
+            return regency
+        except Exception as e:
+            print(f"Error getting regency: {str(e)}")
+            raise
     
     def _get_subdistrict_name(self, subdistrict_id: Optional[UUID]) -> Optional[str]:
         """Get subdistrict name by ID."""

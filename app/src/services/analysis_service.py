@@ -288,7 +288,8 @@ class AnalysisService:
                 population_points, 
                 health_facilities, 
                 regency_id, 
-                service_radius_km
+                service_radius_km,
+                aggressive_filtering=True  # Set to False for more detailed data
             )
             
             heatmap_data = HeatmapData(
@@ -380,7 +381,7 @@ class AnalysisService:
         
         points = self._execute_with_retry(execute_query)
         
-        logger.info(f"Found {len(points)} population points for regency {regency_id}")
+        print(f"Found {len(points)} population points for regency {regency_id}")
         
         # Validate coordinates
         valid_points = []
@@ -388,9 +389,15 @@ class AnalysisService:
             if point['latitude'] is not None and point['longitude'] is not None:
                 valid_points.append(point)
             else:
-                logger.warning(f"Invalid coordinates for population point {point['id']}: lat={point['latitude']}, lng={point['longitude']}")
+                print(f"Invalid coordinates for population point {point['id']}: lat={point['latitude']}, lng={point['longitude']}")
         
-        logger.info(f"Valid population points: {len(valid_points)}/{len(points)}")
+        print(f"Valid population points: {len(valid_points)}/{len(points)}")
+        
+        # Debug: Log first few population points to verify data
+        if valid_points:
+            print(f"Sample population points:")
+            for i, point in enumerate(valid_points[:3]):
+                print(f"  Point {i+1}: ID={point['id']}, lat={point['latitude']:.6f}, lng={point['longitude']:.6f}, population={point['population_count']}")
         
         return valid_points
 
@@ -423,7 +430,7 @@ class AnalysisService:
         
         facilities = self._execute_with_retry(execute_query)
         
-        logger.info(f"Found {len(facilities)} health facilities for regency {regency_id}")
+        print(f"Found {len(facilities)} health facilities for regency {regency_id}")
         
         # Validate coordinates
         valid_facilities = []
@@ -431,16 +438,23 @@ class AnalysisService:
             if facility['latitude'] is not None and facility['longitude'] is not None:
                 valid_facilities.append(facility)
             else:
-                logger.warning(f"Invalid coordinates for health facility {facility['id']}: lat={facility['latitude']}, lng={facility['longitude']}")
+                print(f"Invalid coordinates for health facility {facility['id']}: lat={facility['latitude']}, lng={facility['longitude']}")
         
-        logger.info(f"Valid health facilities: {len(valid_facilities)}/{len(facilities)}")
+        print(f"Valid health facilities: {len(valid_facilities)}/{len(facilities)}")
+        
+        # Debug: Log first few health facilities to verify data
+        if valid_facilities:
+            print(f"Sample health facilities:")
+            for i, facility in enumerate(valid_facilities[:3]):
+                print(f"  Facility {i+1}: ID={facility['id']}, name='{facility['name']}', lat={facility['latitude']:.6f}, lng={facility['longitude']:.6f}, type={facility['type']}")
         
         return valid_facilities
 
     async def _generate_heatmap_grid(self, population_points: List[Dict], 
                                    health_facilities: List[Dict], 
                                    regency_id: Union[UUID, str],
-                                   service_radius_km: float) -> List[HeatmapPoint]:
+                                   service_radius_km: float,
+                                   aggressive_filtering: bool = True) -> List[HeatmapPoint]:
         """Generate a grid of heatmap points with real access scores and population density."""
         
         if not population_points:
@@ -454,14 +468,26 @@ class AnalysisService:
         min_lat, max_lat = min(lats), max(lats)
         min_lng, max_lng = min(lngs), max(lngs)
         
+        logger.info(f"Population points bounding box: lat({min_lat:.6f}, {max_lat:.6f}), lng({min_lng:.6f}, {max_lng:.6f})")
+        print(f"Population points bounding box: lat({min_lat:.6f}, {max_lat:.6f}), lng({min_lng:.6f}, {max_lng:.6f})")
+        print(f"Found {len(population_points)} population points and {len(health_facilities)} health facilities")
+        
         # Generate grid points (adjust grid density as needed)
         grid_size = 0.01  # Approximately 1km grid cells
         heatmap_points = []
+        total_grid_points = 0
+        included_points = 0
         
         lat = min_lat
         while lat <= max_lat:
             lng = min_lng
             while lng <= max_lng:
+                total_grid_points += 1
+                
+                # Log first few grid points for debugging
+                if total_grid_points <= 3:
+                    print(f"Processing grid point {total_grid_points}: lat={lat:.6f}, lng={lng:.6f}")
+                
                 # Calculate population density around this grid point
                 population_density = self._calculate_population_density(
                     population_points, lat, lng, grid_size
@@ -472,8 +498,37 @@ class AnalysisService:
                     lat, lng, health_facilities, service_radius_km
                 )
                 
-                # Only include points with some population or access relevance
-                if population_density > 0 or access_score < 1.0:
+                # Log first few results for debugging
+                if total_grid_points <= 3:
+                    print(f"Grid point {total_grid_points} results: density={population_density:.2f}, access_score={access_score:.3f}, distance={distance_to_facility:.2f}km")
+                
+                # Smart filtering: Only include points that are meaningful for visualization
+                should_include = False
+                
+                if aggressive_filtering:
+                    # Aggressive filtering: Only include points with:
+                    # 1. Population density > 0 (actual population)
+                    # 2. Access score < 0.8 (poor access areas - these are important to show)
+                    # 3. Access score between 0.8-1.0 but with some population nearby (transitional areas)
+                    if population_density > 0:
+                        # Always include points with population
+                        should_include = True
+                    elif access_score < 0.8:
+                        # Include poor access areas (important for planning)
+                        should_include = True
+                    elif access_score < 1.0:
+                        # For good access areas, only include if there's some population nearby
+                        # Check if any population points are within 3km
+                        nearby_population = self._check_nearby_population(population_points, lat, lng, 3.0)
+                        if nearby_population > 0:
+                            should_include = True
+                else:
+                    # Less aggressive filtering: Include more points for detailed analysis
+                    if population_density > 0 or access_score < 1.0:
+                        should_include = True
+                
+                if should_include:
+                    included_points += 1
                     heatmap_points.append(HeatmapPoint(
                         latitude=lat,
                         longitude=lng,
@@ -485,6 +540,9 @@ class AnalysisService:
                 lng += grid_size
             lat += grid_size
         
+        print(f"Generated {total_grid_points} grid points, included {included_points} points in heatmap")
+        print(f"Filtering efficiency: {included_points/total_grid_points*100:.1f}% of points included")
+        
         return heatmap_points
 
     def _calculate_population_density(self, population_points: List[Dict], 
@@ -492,8 +550,17 @@ class AnalysisService:
                                    grid_size: float) -> float:
         """Calculate population density around a grid point."""
         total_population = 0
-        search_radius = grid_size * 0.5  # Half grid size as search radius
+        search_radius = grid_size * 2.0  # Increase search radius to capture more population points
         
+        # Convert search radius from degrees to kilometers (rough approximation)
+        search_radius_km = search_radius * 111.0  # 1 degree ≈ 111 km
+        
+        # Only log for first few calculations to avoid spam
+        debug_log = False  # Set to True temporarily for debugging if needed
+        if debug_log:
+            print(f"Calculating population density for grid point ({grid_lat}, {grid_lng}) with search radius {search_radius} degrees ({search_radius_km:.2f} km)")
+        
+        points_in_radius = 0
         for point in population_points:
             distance = self._calculate_distance(
                 grid_lat, grid_lng, 
@@ -501,29 +568,44 @@ class AnalysisService:
             )
             
             # Use inverse distance weighting for population contribution
-            if distance <= search_radius:
-                weight = 1.0 - (distance / search_radius)
+            if distance <= search_radius_km:  # Compare with km, not degrees
+                points_in_radius += 1
+                weight = 1.0 - (distance / search_radius_km)
                 total_population += point['population_count'] * weight
+                if debug_log:
+                    print(f"Point {point['id']} at distance {distance:.4f}km contributes {point['population_count'] * weight:.2f} people")
+        
+        if debug_log:
+            print(f"Found {points_in_radius} population points within {search_radius_km:.2f}km radius")
         
         # Convert to population density (people per km²)
         area_km2 = (grid_size * 111) ** 2  # Rough conversion to km²
-        return total_population / area_km2 if area_km2 > 0 else 0.0
+        density = total_population / area_km2 if area_km2 > 0 else 0.0
+        
+        if debug_log:
+            print(f"Total population: {total_population}, Area: {area_km2:.4f} km², Density: {density:.2f} people/km²")
+        
+        return density
 
     def _calculate_access_score(self, lat: float, lng: float, 
                               health_facilities: List[Dict], 
                               service_radius_km: float) -> Tuple[float, float]:
         """Calculate access score based on distance to nearest health facility."""
         if not health_facilities:
+            print(f"No health facilities found for point ({lat}, {lng})")
             return 0.0, float('inf')  # No access if no facilities
         
         min_distance = float('inf')
+        nearest_facility = None
         
         for facility in health_facilities:
             distance = self._calculate_distance(
                 lat, lng, 
                 facility['latitude'], facility['longitude']
             )
-            min_distance = min(min_distance, distance)
+            if distance < min_distance:
+                min_distance = distance
+                nearest_facility = facility['name']
         
         # Calculate access score (1.0 = full access, 0.0 = no access)
         if min_distance <= service_radius_km:
@@ -531,6 +613,9 @@ class AnalysisService:
         else:
             # Gradual decrease in access score beyond service radius
             access_score = max(0.0, 1.0 - ((min_distance - service_radius_km) / service_radius_km))
+        
+        # Only log for debugging if needed
+        # print(f"Access score for point ({lat}, {lng}): nearest facility '{nearest_facility}' at {min_distance:.2f}km, access_score={access_score:.3f}")
         
         return access_score, min_distance
 
@@ -557,6 +642,15 @@ class AnalysisService:
         earth_radius = 6371.0
         
         return earth_radius * c
+    
+    def _check_nearby_population(self, population_points: List[Dict], lat: float, lng: float, radius_km: float) -> int:
+        """Check if there are any population points within a given radius."""
+        nearby_count = 0
+        for point in population_points:
+            distance = self._calculate_distance(lat, lng, point['latitude'], point['longitude'])
+            if distance <= radius_km:
+                nearby_count += 1
+        return nearby_count
     
     @analysis_cache(expire=3600)  # Cache for 1 hour
     async def calculate_priority_scores(self, regency_id: Union[UUID, str], 
