@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from app.src.config.settings import settings
+from app.src.config.cache import init_cache
 from app.src.views.auth_view import auth_router
 from app.src.views.region_view import region_router
 from app.src.views.analysis_view import analysis_router
@@ -40,6 +41,11 @@ app.include_router(region_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
 app.include_router(simulation_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+
+# Initialize cache on startup
+@app.on_event("startup")
+async def startup_event():
+    await init_cache()
 
 # Global exception handlers
 @app.exception_handler(AuthenticationException)

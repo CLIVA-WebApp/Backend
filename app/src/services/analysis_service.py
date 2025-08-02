@@ -1,21 +1,28 @@
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, Tuple
 from app.src.schemas.analysis_schema import (
     HeatmapData,
     HeatmapPoint,
     PriorityScoreData,
     SubDistrictScore,
-    SubDistrictDetails
+    SubDistrictDetails,
+    AnalysisSummary,
+    SummaryMetrics,
+    FacilityOverview
 )
 from app.src.schemas.region_schema import RegencySchema, SubDistrictSchema, FacilitySchema
 from app.src.config.database import SessionLocal
+from app.src.config.cache import analysis_cache, get_cache_key
 from app.src.models.regency import Regency
 from app.src.models.subdistrict import Subdistrict
 from app.src.models.health_facility import HealthFacility
+from app.src.models.population_point import PopulationPoint
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
+from sqlalchemy.exc import OperationalError, DisconnectionError
 import logging
 import math
 import random
+import time
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -23,6 +30,58 @@ logger = logging.getLogger(__name__)
 class AnalysisService:
     def __init__(self):
         self.db: Session = SessionLocal()
+    
+    def _get_db_session(self) -> Session:
+        """Get a fresh database session with retry logic."""
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                # Test the connection
+                self.db.execute(text("SELECT 1"))
+                return self.db
+            except (OperationalError, DisconnectionError) as e:
+                logger.warning(f"Database connection attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    # Create a new session
+                    self.db.close()
+                    self.db = SessionLocal()
+                else:
+                    logger.error("All database connection attempts failed")
+                    raise
+            except Exception as e:
+                logger.error(f"Unexpected database error: {e}")
+                raise
+    
+    def _execute_with_retry(self, operation, *args, **kwargs):
+        """Execute a database operation with retry logic."""
+        max_retries = 3
+        retry_delay = 1
+        
+        for attempt in range(max_retries):
+            try:
+                # Check if operation expects a database session as first argument
+                import inspect
+                sig = inspect.signature(operation)
+                if len(sig.parameters) > 0 and list(sig.parameters.keys())[0] == 'db':
+                    # Operation expects db session as first argument
+                    db = self._get_db_session()
+                    return operation(db, *args, **kwargs)
+                else:
+                    # Operation doesn't expect db session, just call it directly
+                    return operation(*args, **kwargs)
+            except (OperationalError, DisconnectionError) as e:
+                logger.warning(f"Database operation attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                else:
+                    logger.error("All database operation attempts failed")
+                    raise
+            except Exception as e:
+                logger.error(f"Unexpected database error: {e}")
+                raise
     
     async def get_regency_by_id(self, regency_id: Union[UUID, str]) -> Optional[RegencySchema]:
         """
@@ -41,7 +100,9 @@ class AnalysisService:
                 )
                 return mock_regency
             
-            regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
+            # Get a fresh database session with retry logic
+            db = self._get_db_session()
+            regency = db.query(Regency).filter(Regency.id == regency_id).first()
             
             if not regency:
                 logger.warning(f"Regency with ID {regency_id} not found")
@@ -52,7 +113,7 @@ class AnalysisService:
                 name=regency.name,
                 pum_code=regency.pum_code,
                 province_id=regency.province_id,
-                province_name=regency.province.name if regency.province else None,
+                province_name=regency.province.name if hasattr(regency, 'province') and regency.province else None,
                 area_km2=regency.area_km2
             )
                 
@@ -93,7 +154,7 @@ class AnalysisService:
                 name=subdistrict.name,
                 pum_code=subdistrict.pum_code,
                 regency_id=subdistrict.regency_id,
-                regency_name=subdistrict.regency.name if subdistrict.regency else None,
+                regency_name=subdistrict.regency.name if hasattr(subdistrict, 'regency') and subdistrict.regency else None,
                 population_count=subdistrict.population_count,
                 poverty_level=subdistrict.poverty_level,
                 area_km2=subdistrict.area_km2
@@ -140,21 +201,31 @@ class AnalysisService:
                 return mock_facilities
             
             facilities = self.db.query(HealthFacility).filter(HealthFacility.sub_district_id == subdistrict_id).all()
-            
+             
             facility_schemas = []
             for facility in facilities:
-                facility_schema = FacilitySchema(
-                    id=facility.id,
-                    name=facility.name,
-                    type=facility.type,
-                    latitude=facility.latitude,
-                    longitude=facility.longitude,
-                    regency_id=facility.regency_id,
-                    regency_name=facility.regency.name if facility.regency else None,
-                    sub_district_id=facility.sub_district_id,
-                    sub_district_name=facility.sub_district.name if facility.sub_district else None
-                )
-                facility_schemas.append(facility_schema)
+                # Extract coordinates from geometry
+                coords_query = text("""
+                    SELECT 
+                        ST_X(geom) as longitude,
+                        ST_Y(geom) as latitude
+                    FROM health_facilities 
+                    WHERE id = :facility_id
+                """)
+                coords_result = self.db.execute(coords_query, {"facility_id": facility.id}).first()
+            
+            facility_schema = FacilitySchema(
+                id=facility.id,
+                name=facility.name,
+                type=facility.type,
+                latitude=coords_result.latitude if coords_result else 0.0,
+                longitude=coords_result.longitude if coords_result else 0.0,
+                regency_id=facility.sub_district.regency_id if hasattr(facility, 'sub_district') and facility.sub_district else None,
+                regency_name=facility.sub_district.regency.name if hasattr(facility, 'sub_district') and facility.sub_district and hasattr(facility.sub_district, 'regency') and facility.sub_district.regency else None,
+                sub_district_id=facility.sub_district_id,
+                sub_district_name=facility.sub_district.name if hasattr(facility, 'sub_district') and facility.sub_district else None
+            )
+            facility_schemas.append(facility_schema)
             
             logger.info(f"Retrieved {len(facility_schemas)} facilities for sub-district {subdistrict_id}")
             return facility_schemas
@@ -163,9 +234,10 @@ class AnalysisService:
             logger.error(f"Error retrieving facilities for sub-district {subdistrict_id}: {str(e)}")
             raise
     
+    @analysis_cache(expire=3600)  # Cache for 1 hour
     async def generate_heatmap_data(self, regency_id: Union[UUID, str]) -> HeatmapData:
         """
-        Generate heatmap data for a specific regency.
+        Generate heatmap data for a specific regency using real spatial analysis.
         """
         try:
             # Check if this is a mock request
@@ -200,40 +272,434 @@ class AnalysisService:
             if not regency:
                 raise ValueError(f"Regency with ID {regency_id} not found")
             
-            # Mock heatmap generation for now
-            # In reality, this would involve complex spatial analysis
-            heatmap_points = []
-            total_population = 5000000
-            population_outside_radius = 750000
             service_radius_km = 5.0
             
-            # Generate mock heatmap points
-            for i in range(10):
-                lat = -6.4 + (random.random() - 0.5) * 0.2
-                lng = 106.8 + (random.random() - 0.5) * 0.2
-                heatmap_points.append(HeatmapPoint(
-                    latitude=lat,
-                    longitude=lng,
-                    population_density=random.uniform(800, 2000),
-                    access_score=random.uniform(0.3, 0.9),
-                    distance_to_facility=random.uniform(1.0, 8.0)
-                ))
+            # Get total population and population outside service radius
+            population_stats = await self._get_population_statistics(regency_id, service_radius_km)
+            
+            # Get population points for the regency
+            population_points = await self._get_population_points(regency_id)
+            
+            # Get health facilities for the regency
+            health_facilities = await self._get_health_facilities(regency_id)
+            
+            # Generate heatmap grid points
+            heatmap_points = await self._generate_heatmap_grid(
+                population_points, 
+                health_facilities, 
+                regency_id, 
+                service_radius_km
+            )
             
             heatmap_data = HeatmapData(
                 regency_id=regency_id,
                 regency_name=regency.name,
-                total_population=total_population,
-                population_outside_radius=population_outside_radius,
+                total_population=population_stats['total_population'],
+                population_outside_radius=population_stats['population_outside_radius'],
                 service_radius_km=service_radius_km,
                 heatmap_points=heatmap_points
             )
             
-            logger.info(f"Generated heatmap data for regency {regency.name}")
+            logger.info(f"Generated real heatmap data for regency {regency.name}")
             return heatmap_data
             
         except Exception as e:
             logger.error(f"Error generating heatmap data for regency {regency_id}: {str(e)}")
             raise
+
+    async def _get_population_statistics(self, regency_id: Union[UUID, str], service_radius_km: float) -> Dict[str, int]:
+        """Get total population and population outside service radius for the regency."""
+        query = text("""
+            SELECT 
+                COALESCE(SUM(pp.population_count), 0) as total_population,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN NOT EXISTS (
+                            SELECT 1 FROM health_facilities hf
+                            JOIN subdistricts sd ON hf.subdistrict_id = sd.id
+                            WHERE sd.regency_id = :regency_id
+                            AND ST_DWithin(
+                                pp.geom::geography,
+                                hf.geom::geography,
+                                :service_radius_meters
+                            )
+                        ) THEN pp.population_count
+                        ELSE 0
+                    END
+                ), 0) as population_outside_radius
+            FROM population_points pp
+            JOIN subdistricts sd ON pp.subdistrict_id = sd.id
+            WHERE sd.regency_id = :regency_id
+        """)
+        
+        def execute_query(db):
+            result = db.execute(query, {
+                "regency_id": regency_id,
+                "service_radius_meters": service_radius_km * 1000
+            })
+            return result.fetchone()
+        
+        row = self._execute_with_retry(execute_query)
+        
+        total_population = int(row.total_population) if row else 0
+        population_outside_radius = int(row.population_outside_radius) if row else 0
+        
+        logger.info(f"Population stats for regency {regency_id}: total={total_population}, outside_radius={population_outside_radius}")
+        
+        return {
+            'total_population': total_population,
+            'population_outside_radius': population_outside_radius
+        }
+
+    async def _get_population_points(self, regency_id: Union[UUID, str]) -> List[Dict]:
+        """Get all population points in the regency with their coordinates."""
+        query = text("""
+            SELECT 
+                pp.id,
+                pp.population_count,
+                ST_X(pp.geom) as longitude,
+                ST_Y(pp.geom) as latitude,
+                pp.subdistrict_id
+            FROM population_points pp
+            JOIN subdistricts sd ON pp.subdistrict_id = sd.id
+            WHERE sd.regency_id = :regency_id
+        """)
+        
+        def execute_query(db):
+            result = db.execute(query, {"regency_id": regency_id})
+            points = []
+            for row in result:
+                points.append({
+                    'id': row.id,
+                    'population_count': row.population_count,
+                    'longitude': row.longitude,
+                    'latitude': row.latitude,
+                    'subdistrict_id': row.subdistrict_id
+                })
+            return points
+        
+        points = self._execute_with_retry(execute_query)
+        
+        logger.info(f"Found {len(points)} population points for regency {regency_id}")
+        
+        # Validate coordinates
+        valid_points = []
+        for point in points:
+            if point['latitude'] is not None and point['longitude'] is not None:
+                valid_points.append(point)
+            else:
+                logger.warning(f"Invalid coordinates for population point {point['id']}: lat={point['latitude']}, lng={point['longitude']}")
+        
+        logger.info(f"Valid population points: {len(valid_points)}/{len(points)}")
+        
+        return valid_points
+
+    async def _get_health_facilities(self, regency_id: Union[UUID, str]) -> List[Dict]:
+        """Get all health facilities in the regency with their coordinates."""
+        query = text("""
+            SELECT 
+                hf.id,
+                hf.name,
+                hf.type,
+                ST_X(hf.geom) as longitude,
+                ST_Y(hf.geom) as latitude
+            FROM health_facilities hf
+            JOIN subdistricts sd ON hf.subdistrict_id = sd.id
+            WHERE sd.regency_id = :regency_id
+        """)
+        
+        def execute_query(db):
+            result = db.execute(query, {"regency_id": regency_id})
+            facilities = []
+            for row in result:
+                facilities.append({
+                    'id': row.id,
+                    'name': row.name,
+                    'type': row.type,
+                    'longitude': row.longitude,
+                    'latitude': row.latitude
+                })
+            return facilities
+        
+        facilities = self._execute_with_retry(execute_query)
+        
+        logger.info(f"Found {len(facilities)} health facilities for regency {regency_id}")
+        
+        # Validate coordinates
+        valid_facilities = []
+        for facility in facilities:
+            if facility['latitude'] is not None and facility['longitude'] is not None:
+                valid_facilities.append(facility)
+            else:
+                logger.warning(f"Invalid coordinates for health facility {facility['id']}: lat={facility['latitude']}, lng={facility['longitude']}")
+        
+        logger.info(f"Valid health facilities: {len(valid_facilities)}/{len(facilities)}")
+        
+        return valid_facilities
+
+    async def _generate_heatmap_grid(self, population_points: List[Dict], 
+                                   health_facilities: List[Dict], 
+                                   regency_id: Union[UUID, str],
+                                   service_radius_km: float) -> List[HeatmapPoint]:
+        """Generate a grid of heatmap points with real access scores and population density."""
+        
+        if not population_points:
+            logger.warning(f"No population points found for regency {regency_id}")
+            return []
+        
+        # Calculate bounding box of population points
+        lats = [p['latitude'] for p in population_points]
+        lngs = [p['longitude'] for p in population_points]
+        
+        min_lat, max_lat = min(lats), max(lats)
+        min_lng, max_lng = min(lngs), max(lngs)
+        
+        # Generate grid points (adjust grid density as needed)
+        grid_size = 0.01  # Approximately 1km grid cells
+        heatmap_points = []
+        
+        lat = min_lat
+        while lat <= max_lat:
+            lng = min_lng
+            while lng <= max_lng:
+                # Calculate population density around this grid point
+                population_density = self._calculate_population_density(
+                    population_points, lat, lng, grid_size
+                )
+                
+                # Calculate access score based on distance to nearest facility
+                access_score, distance_to_facility = self._calculate_access_score(
+                    lat, lng, health_facilities, service_radius_km
+                )
+                
+                # Only include points with some population or access relevance
+                if population_density > 0 or access_score < 1.0:
+                    heatmap_points.append(HeatmapPoint(
+                        latitude=lat,
+                        longitude=lng,
+                        population_density=population_density,
+                        access_score=access_score,
+                        distance_to_facility=distance_to_facility
+                    ))
+                
+                lng += grid_size
+            lat += grid_size
+        
+        return heatmap_points
+
+    def _calculate_population_density(self, population_points: List[Dict], 
+                                   grid_lat: float, grid_lng: float, 
+                                   grid_size: float) -> float:
+        """Calculate population density around a grid point."""
+        total_population = 0
+        search_radius = grid_size * 0.5  # Half grid size as search radius
+        
+        for point in population_points:
+            distance = self._calculate_distance(
+                grid_lat, grid_lng, 
+                point['latitude'], point['longitude']
+            )
+            
+            # Use inverse distance weighting for population contribution
+            if distance <= search_radius:
+                weight = 1.0 - (distance / search_radius)
+                total_population += point['population_count'] * weight
+        
+        # Convert to population density (people per km²)
+        area_km2 = (grid_size * 111) ** 2  # Rough conversion to km²
+        return total_population / area_km2 if area_km2 > 0 else 0.0
+
+    def _calculate_access_score(self, lat: float, lng: float, 
+                              health_facilities: List[Dict], 
+                              service_radius_km: float) -> Tuple[float, float]:
+        """Calculate access score based on distance to nearest health facility."""
+        if not health_facilities:
+            return 0.0, float('inf')  # No access if no facilities
+        
+        min_distance = float('inf')
+        
+        for facility in health_facilities:
+            distance = self._calculate_distance(
+                lat, lng, 
+                facility['latitude'], facility['longitude']
+            )
+            min_distance = min(min_distance, distance)
+        
+        # Calculate access score (1.0 = full access, 0.0 = no access)
+        if min_distance <= service_radius_km:
+            access_score = 1.0
+        else:
+            # Gradual decrease in access score beyond service radius
+            access_score = max(0.0, 1.0 - ((min_distance - service_radius_km) / service_radius_km))
+        
+        return access_score, min_distance
+
+    def _calculate_distance(self, lat1: float, lng1: float, 
+                          lat2: float, lng2: float) -> float:
+        """Calculate distance between two points using Haversine formula."""
+        import math
+        
+        # Convert to radians
+        lat1_rad = math.radians(lat1)
+        lng1_rad = math.radians(lng1)
+        lat2_rad = math.radians(lat2)
+        lng2_rad = math.radians(lng2)
+        
+        # Haversine formula
+        dlat = lat2_rad - lat1_rad
+        dlng = lng2_rad - lng1_rad
+        
+        a = (math.sin(dlat/2)**2 + 
+             math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlng/2)**2)
+        c = 2 * math.asin(math.sqrt(a))
+        
+        # Earth radius in kilometers
+        earth_radius = 6371.0
+        
+        return earth_radius * c
+    
+    @analysis_cache(expire=3600)  # Cache for 1 hour
+    async def calculate_priority_scores(self, regency_id: Union[UUID, str], 
+                                      service_radius_km: float = 5.0,
+                                      gap_weight: float = 0.4,
+                                      efficiency_weight: float = 0.3,
+                                      vulnerability_weight: float = 0.3) -> List[SubDistrictScore]:
+        """
+        Calculate priority scores for sub-districts within a regency using PostGIS spatial analysis.
+        
+        Args:
+            regency_id: ID of the regency to analyze
+            service_radius_km: Service radius in kilometers (default: 5.0)
+            gap_weight: Weight for gap factor in composite score (default: 0.4)
+            efficiency_weight: Weight for efficiency factor in composite score (default: 0.3)
+            vulnerability_weight: Weight for vulnerability factor in composite score (default: 0.3)
+        
+        Returns:
+            List of SubDistrictScore objects sorted by composite score (highest first)
+        """
+        try:
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                return self._generate_mock_priority_scores()
+            
+            # Validate weights sum to 1.0
+            total_weight = gap_weight + efficiency_weight + vulnerability_weight
+            if abs(total_weight - 1.0) > 0.001:
+                raise ValueError("Weights must sum to 1.0")
+            
+            # Get all subdistricts in the regency with their basic data
+            subdistricts_query = text("""
+                SELECT 
+                    sd.id,
+                    sd.name,
+                    sd.poverty_level,
+                    sd.area_km2,
+                    COALESCE(sd.population_count, 0) as population_count
+                FROM subdistricts sd
+                WHERE sd.regency_id = :regency_id
+            """)
+            
+            subdistricts_result = self.db.execute(subdistricts_query, {"regency_id": regency_id})
+            subdistricts_data = []
+            
+            for row in subdistricts_result:
+                subdistricts_data.append({
+                    'id': row.id,
+                    'name': row.name,
+                    'poverty_level': row.poverty_level or 0,
+                    'area_km2': row.area_km2 or 0,
+                    'population_count': row.population_count
+                })
+            
+            if not subdistricts_data:
+                logger.warning(f"No subdistricts found for regency {regency_id}")
+                return []
+            
+            # Calculate raw factors for each subdistrict
+            subdistrict_scores = []
+            
+            for subdistrict in subdistricts_data:
+                # Calculate gap factor: proportion of population outside service radius
+                gap_factor_raw = await self._calculate_gap_factor(
+                    subdistrict['id'], 
+                    subdistrict['population_count'], 
+                    service_radius_km
+                )
+                
+                # Calculate efficiency factor: population density
+                efficiency_factor_raw = self._calculate_efficiency_factor(
+                    subdistrict['population_count'], 
+                    subdistrict['area_km2']
+                )
+                
+                # Vulnerability factor: poverty level (already 0-100 scale)
+                vulnerability_factor_raw = subdistrict['poverty_level']
+                
+                subdistrict_scores.append({
+                    'id': subdistrict['id'],
+                    'name': subdistrict['name'],
+                    'gap_factor_raw': gap_factor_raw,
+                    'efficiency_factor_raw': efficiency_factor_raw,
+                    'vulnerability_factor_raw': vulnerability_factor_raw
+                })
+            
+            # Perform min-max normalization
+            normalized_scores = self._normalize_factors(subdistrict_scores)
+            
+            # Calculate composite scores
+            final_scores = []
+            for score in normalized_scores:
+                composite_score = (
+                    gap_weight * score['gap_factor_normalized'] +
+                    efficiency_weight * score['efficiency_factor_normalized'] +
+                    vulnerability_weight * score['vulnerability_factor_normalized']
+                )
+                
+                final_scores.append(SubDistrictScore(
+                    sub_district_id=score['id'],
+                    sub_district_name=score['name'],
+                    gap_factor=score['gap_factor_normalized'],
+                    efficiency_factor=score['efficiency_factor_normalized'],
+                    vulnerability_factor=score['vulnerability_factor_normalized'],
+                    composite_score=composite_score,
+                    rank=0  # Will be set after sorting
+                ))
+            
+            # Sort by composite score (highest first) and assign ranks
+            final_scores.sort(key=lambda x: x.composite_score, reverse=True)
+            for i, score in enumerate(final_scores):
+                score.rank = i + 1
+            
+            logger.info(f"Calculated priority scores for {len(final_scores)} sub-districts in regency {regency_id}")
+            return final_scores
+            
+        except Exception as e:
+            logger.error(f"Error calculating priority scores for regency {regency_id}: {str(e)}")
+            raise
+    
+    def _generate_mock_priority_scores(self) -> List[SubDistrictScore]:
+        """Generate mock priority scores for testing purposes."""
+        mock_scores = [
+            SubDistrictScore(
+                sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                sub_district_name="Kecamatan Cibinong",
+                gap_factor=0.75,
+                efficiency_factor=0.65,
+                vulnerability_factor=0.80,
+                composite_score=0.73,
+                rank=1
+            ),
+            SubDistrictScore(
+                sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
+                sub_district_name="Kecamatan Gunung Putri",
+                gap_factor=0.60,
+                efficiency_factor=0.70,
+                vulnerability_factor=0.65,
+                composite_score=0.65,
+                rank=2
+            )
+        ]
+        return mock_scores
     
     async def generate_priority_score_data(self, regency_id: Union[UUID, str]) -> PriorityScoreData:
         """
@@ -274,34 +740,15 @@ class AnalysisService:
             if not regency:
                 raise ValueError(f"Regency with ID {regency_id} not found")
             
-            # Mock priority score generation for now
-            # In reality, this would involve complex calculations
-            sub_districts = self.db.query(Subdistrict).filter(Subdistrict.regency_id == regency_id).all()
-            
-            sub_district_scores = []
-            for i, subdistrict in enumerate(sub_districts):
-                # Mock calculations for demonstration
-                gap_factor = random.uniform(0.4, 0.9)
-                efficiency_factor = random.uniform(0.3, 0.8)
-                vulnerability_factor = random.uniform(0.5, 0.9)
-                composite_score = (gap_factor + efficiency_factor + vulnerability_factor) / 3
-                
-                sub_district_scores.append(SubDistrictScore(
-                    sub_district_id=subdistrict.id,
-                    sub_district_name=subdistrict.name,
-                    gap_factor=gap_factor,
-                    efficiency_factor=efficiency_factor,
-                    vulnerability_factor=vulnerability_factor,
-                    composite_score=composite_score,
-                    rank=i + 1
-                ))
-            
-            # Sort by composite score (highest first)
-            sub_district_scores.sort(key=lambda x: x.composite_score, reverse=True)
-            
-            # Update ranks
-            for i, score in enumerate(sub_district_scores):
-                score.rank = i + 1
+            # Use the new calculate_priority_scores function with default parameters
+            # These can be made configurable later through API parameters
+            sub_district_scores = await self.calculate_priority_scores(
+                regency_id=regency_id,
+                service_radius_km=5.0,  # Default 5km radius
+                gap_weight=0.4,         # 40% weight for gap factor
+                efficiency_weight=0.3,   # 30% weight for efficiency factor
+                vulnerability_weight=0.3  # 30% weight for vulnerability factor
+            )
             
             priority_data = PriorityScoreData(
                 regency_id=regency_id,
@@ -362,7 +809,7 @@ class AnalysisService:
                 raise ValueError(f"Sub-district with ID {subdistrict_id} not found")
             
             # Get facilities for this sub-district
-            facilities = self.db.query(HealthFacility).filter(HealthFacility.sub_district_id == subdistrict_id).all()
+            facilities = self.db.query(HealthFacility).filter(HealthFacility.subdistrict_id == subdistrict_id).all()
             
             # Mock detailed statistics
             population = subdistrict.population_count or 100000
@@ -370,27 +817,60 @@ class AnalysisService:
             population_density = population / area_km2 if area_km2 > 0 else 0
             poverty_rate = subdistrict.poverty_level or 15.0
             
-            # Mock calculated scores
-            gap_factor = random.uniform(0.4, 0.9)
-            efficiency_factor = random.uniform(0.3, 0.8)
-            vulnerability_factor = random.uniform(0.5, 0.9)
-            composite_score = (gap_factor + efficiency_factor + vulnerability_factor) / 3
+            # Calculate scores using the new function
+            sub_district_scores = await self.calculate_priority_scores(
+                regency_id=subdistrict.regency_id,
+                service_radius_km=5.0,
+                gap_weight=0.4,
+                efficiency_weight=0.3,
+                vulnerability_weight=0.3
+            )
+            
+            # Find the score for this specific sub-district
+            sub_district_score = next(
+                (score for score in sub_district_scores if score.sub_district_id == subdistrict.id),
+                None
+            )
+            
+            if sub_district_score:
+                gap_factor = sub_district_score.gap_factor
+                efficiency_factor = sub_district_score.efficiency_factor
+                vulnerability_factor = sub_district_score.vulnerability_factor
+                composite_score = sub_district_score.composite_score
+                rank = sub_district_score.rank
+            else:
+                # Fallback to mock values if calculation fails
+                gap_factor = random.uniform(0.4, 0.9)
+                efficiency_factor = random.uniform(0.3, 0.8)
+                vulnerability_factor = random.uniform(0.5, 0.9)
+                composite_score = (gap_factor + efficiency_factor + vulnerability_factor) / 3
+                rank = 1
             
             # Convert facilities to dict format
             existing_facilities = []
             for facility in facilities:
+                # Extract coordinates from geometry
+                coords_query = text("""
+                    SELECT 
+                        ST_X(geom) as longitude,
+                        ST_Y(geom) as latitude
+                    FROM health_facilities 
+                    WHERE id = :facility_id
+                """)
+                coords_result = self.db.execute(coords_query, {"facility_id": facility.id}).first()
+                
                 existing_facilities.append({
                     "name": facility.name,
                     "type": facility.type.value if hasattr(facility.type, 'value') else str(facility.type),
-                    "latitude": facility.latitude,
-                    "longitude": facility.longitude
+                    "latitude": coords_result.latitude if coords_result else 0.0,
+                    "longitude": coords_result.longitude if coords_result else 0.0
                 })
             
             details = SubDistrictDetails(
                 sub_district_id=subdistrict.id,
                 sub_district_name=subdistrict.name,
                 regency_id=subdistrict.regency_id,
-                regency_name=subdistrict.regency.name if subdistrict.regency else None,
+                regency_name=subdistrict.regency.name if hasattr(subdistrict, 'regency') and subdistrict.regency else None,
                 population=population,
                 area_km2=area_km2,
                 population_density=population_density,
@@ -401,7 +881,7 @@ class AnalysisService:
                 efficiency_factor=efficiency_factor,
                 vulnerability_factor=vulnerability_factor,
                 composite_score=composite_score,
-                rank=1  # Mock rank
+                rank=rank
             )
             
             logger.info(f"Generated sub-district details for {subdistrict.name}")
@@ -409,4 +889,267 @@ class AnalysisService:
             
         except Exception as e:
             logger.error(f"Error generating sub-district details for {subdistrict_id}: {str(e)}")
-            raise 
+            raise
+    
+    @analysis_cache(expire=3600)  # Cache for 1 hour
+    async def generate_analysis_summary(self, regency_id: Union[UUID, str]) -> AnalysisSummary:
+        """
+        Generate a comprehensive analysis summary for a regency.
+        """
+        try:
+            # Check if this is a mock request
+            if str(regency_id) == "mock":
+                mock_summary = AnalysisSummary(
+                    regency_name="Kabupaten Bogor",
+                    summary_metrics=SummaryMetrics(
+                        coverage_percentage=68.5,
+                        average_distance_km=4.7,
+                        average_travel_time_hours=1.2
+                    ),
+                    facility_overview=[
+                        FacilityOverview(
+                            id=UUID("550e8400-e29b-41d4-a716-446655440006"),
+                            name="RS. Borromeus",
+                            type="Hospital",
+                            rating=4.8
+                        ),
+                        FacilityOverview(
+                            id=UUID("550e8400-e29b-41d4-a716-446655440007"),
+                            name="Klinik Medika",
+                            type="Clinic",
+                            rating=4.5
+                        )
+                    ]
+                )
+                return mock_summary
+            
+            # Get regency info
+            def get_regency(db):
+                return db.query(Regency).filter(Regency.id == regency_id).first()
+            
+            regency = self._execute_with_retry(get_regency)
+            if not regency:
+                raise ValueError(f"Regency with ID {regency_id} not found")
+            
+            # Get population statistics
+            population_stats = await self._get_population_statistics(regency_id, 5.0)  # 5km service radius
+            total_population = population_stats['total_population']
+            population_outside_radius = population_stats['population_outside_radius']
+            
+            # Calculate coverage percentage
+            coverage_percentage = ((total_population - population_outside_radius) / total_population * 100) if total_population > 0 else 0.0
+            
+            logger.info(f"Coverage calculation: total_pop={total_population}, outside_radius={population_outside_radius}, coverage={coverage_percentage:.2f}%")
+            
+            # Get health facilities for the regency
+            health_facilities = await self._get_health_facilities(regency_id)
+            
+            # Debug: Check if we have any data at all
+            if total_population == 0:
+                logger.warning(f"No population data found for regency {regency_id}")
+            if not health_facilities:
+                logger.warning(f"No health facilities found for regency {regency_id}")
+            else:
+                logger.info(f"Found {len(health_facilities)} health facilities")
+            
+            # Calculate average distance and travel time
+            average_distance_km, average_travel_time_hours = await self._calculate_average_metrics(
+                regency_id, health_facilities
+            )
+            
+            # Create facility overview
+            facility_overview = []
+            for facility in health_facilities:
+                # For now, use a simple rating based on facility type
+                # In a real implementation, this would come from a rating system
+                rating = self._get_facility_rating(facility['type'])
+                
+                facility_overview.append(FacilityOverview(
+                    id=facility['id'],
+                    name=facility['name'],
+                    type=str(facility['type']),
+                    rating=rating
+                ))
+            
+            summary_metrics = SummaryMetrics(
+                coverage_percentage=coverage_percentage,
+                average_distance_km=average_distance_km,
+                average_travel_time_hours=average_travel_time_hours
+            )
+            
+            analysis_summary = AnalysisSummary(
+                regency_name=regency.name,
+                summary_metrics=summary_metrics,
+                facility_overview=facility_overview
+            )
+            
+            logger.info(f"Generated analysis summary for regency {regency.name}")
+            return analysis_summary
+            
+        except Exception as e:
+            logger.error(f"Error generating analysis summary for regency {regency_id}: {str(e)}")
+            raise
+    
+    def _get_subdistrict_name(self, subdistrict_id: Optional[UUID]) -> Optional[str]:
+        """Get subdistrict name by ID."""
+        if not subdistrict_id:
+            return None
+        
+        subdistrict = self.db.query(Subdistrict).filter(Subdistrict.id == subdistrict_id).first()
+        return subdistrict.name if subdistrict else None
+    
+    async def _calculate_gap_factor(self, subdistrict_id: UUID, total_population: int, service_radius_km: float) -> float:
+        """Calculate gap factor: proportion of population outside service radius."""
+        if total_population == 0:
+            return 0.0
+        
+        # Query to find population points outside service radius
+        query = text("""
+            SELECT COALESCE(SUM(pp.population_count), 0) as population_outside
+            FROM population_points pp
+            WHERE pp.subdistrict_id = :subdistrict_id
+            AND NOT EXISTS (
+                SELECT 1 FROM health_facilities hf
+                WHERE ST_DWithin(
+                    pp.geom::geography, 
+                    hf.geom::geography, 
+                    :service_radius_meters
+                )
+            )
+        """)
+        
+        result = self.db.execute(query, {
+            "subdistrict_id": subdistrict_id,
+            "service_radius_meters": service_radius_km * 1000
+        })
+        
+        row = result.fetchone()
+        population_outside = row.population_outside if row else 0
+        
+        return population_outside / total_population if total_population > 0 else 0.0
+    
+    def _calculate_efficiency_factor(self, population_count: int, area_km2: float) -> float:
+        """Calculate efficiency factor: population density (people per km²)."""
+        if area_km2 <= 0:
+            return 0.0
+        
+        return population_count / area_km2
+    
+    def _normalize_factors(self, subdistrict_scores: List[Dict]) -> List[Dict]:
+        """Perform min-max normalization on all factors."""
+        if not subdistrict_scores:
+            return []
+        
+        # Extract raw values for normalization
+        gap_factors = [score['gap_factor_raw'] for score in subdistrict_scores]
+        efficiency_factors = [score['efficiency_factor_raw'] for score in subdistrict_scores]
+        vulnerability_factors = [score['vulnerability_factor_raw'] for score in subdistrict_scores]
+        
+        # Calculate min and max for each factor
+        gap_min, gap_max = min(gap_factors), max(gap_factors)
+        efficiency_min, efficiency_max = min(efficiency_factors), max(efficiency_factors)
+        vulnerability_min, vulnerability_max = min(vulnerability_factors), max(vulnerability_factors)
+        
+        # Normalize each factor
+        normalized_scores = []
+        for score in subdistrict_scores:
+            # Gap factor normalization
+            if gap_max == gap_min:
+                gap_normalized = 0.5  # Default to middle value if all values are the same
+            else:
+                gap_normalized = (score['gap_factor_raw'] - gap_min) / (gap_max - gap_min)
+            
+            # Efficiency factor normalization
+            if efficiency_max == efficiency_min:
+                efficiency_normalized = 0.5
+            else:
+                efficiency_normalized = (score['efficiency_factor_raw'] - efficiency_min) / (efficiency_max - efficiency_min)
+            
+            # Vulnerability factor normalization
+            if vulnerability_max == vulnerability_min:
+                vulnerability_normalized = 0.5
+            else:
+                vulnerability_normalized = (score['vulnerability_factor_raw'] - vulnerability_min) / (vulnerability_max - vulnerability_min)
+            
+            normalized_scores.append({
+                'id': score['id'],
+                'name': score['name'],
+                'gap_factor_normalized': gap_normalized,
+                'efficiency_factor_normalized': efficiency_normalized,
+                'vulnerability_factor_normalized': vulnerability_normalized
+            })
+        
+        return normalized_scores 
+    
+    async def _calculate_average_metrics(self, regency_id: Union[UUID, str], health_facilities: List[Dict]) -> Tuple[float, float]:
+        """Calculate average distance and travel time for the regency."""
+        if not health_facilities:
+            logger.warning(f"No health facilities found for regency {regency_id}")
+            return 0.0, 0.0
+        
+        # Get all population points in the regency
+        population_points = await self._get_population_points(regency_id)
+        
+        if not population_points:
+            logger.warning(f"No population points found for regency {regency_id}")
+            return 0.0, 0.0
+        
+        total_distance = 0.0
+        total_population = 0
+        
+        logger.info(f"Calculating average metrics for {len(population_points)} population points and {len(health_facilities)} facilities")
+        
+        for i, point in enumerate(population_points):
+            # Find the nearest facility to this population point
+            min_distance = float('inf')
+            nearest_facility = None
+            
+            for facility in health_facilities:
+                distance = self._calculate_distance(
+                    point['latitude'], point['longitude'],
+                    facility['latitude'], facility['longitude']
+                )
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_facility = facility['name']
+            
+            # Weight by population count
+            population_weight = point['population_count']
+            total_distance += min_distance * population_weight
+            total_population += population_weight
+            
+            # Log first few calculations for debugging
+            if i < 3:
+                logger.info(f"Point {i}: lat={point['latitude']:.4f}, lng={point['longitude']:.4f}, "
+                          f"nearest_facility={nearest_facility}, distance={min_distance:.2f}km, "
+                          f"population={population_weight}")
+        
+        # Calculate average distance
+        average_distance_km = total_distance / total_population if total_population > 0 else 0.0
+        
+        # Calculate average travel time using 50 km/h average driving speed
+        average_speed_kmh = 50.0
+        average_travel_time_hours = average_distance_km / average_speed_kmh if average_speed_kmh > 0 else 0.0
+        
+        logger.info(f"Average metrics: distance={average_distance_km:.2f}km, travel_time={average_travel_time_hours:.2f}hours")
+        
+        return average_distance_km, average_travel_time_hours
+    
+    def _get_facility_rating(self, facility_type: str) -> float:
+        """Get a rating for a facility based on its type."""
+        # Simple rating system based on facility type
+        # In a real implementation, this would come from a database or external API
+        ratings = {
+            "Puskesmas": 4.2,
+            "Pustu": 3.8,
+            "Klinik": 4.0,
+            "Rumah Sakit": 4.5,
+            "Hospital": 4.5,
+            "Clinic": 4.0
+        }
+        
+        # Convert enum to string if needed
+        if hasattr(facility_type, 'value'):
+            facility_type = facility_type.value
+        
+        return ratings.get(str(facility_type), 4.0)  # Default rating of 4.0 

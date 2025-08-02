@@ -112,7 +112,7 @@ class RegionService:
                     name=regency.name,
                     pum_code=regency.pum_code,
                     province_id=regency.province_id,
-                    province_name=regency.province.name if regency.province else None,
+                    province_name=regency.province.name if hasattr(regency, 'province') and regency.province else None,
                     area_km2=regency.area_km2
                 ))
             
@@ -163,7 +163,7 @@ class RegionService:
                     name=subdistrict.name,
                     pum_code=subdistrict.pum_code,
                     regency_id=subdistrict.regency_id,
-                    regency_name=subdistrict.regency.name if subdistrict.regency else None,
+                    regency_name=subdistrict.regency.name if hasattr(subdistrict, 'regency') and subdistrict.regency else None,
                     population_count=subdistrict.population_count,
                     poverty_level=subdistrict.poverty_level,
                     area_km2=subdistrict.area_km2
@@ -219,10 +219,10 @@ class RegionService:
                     type=facility.facility_type,
                     latitude=facility.latitude,
                     longitude=facility.longitude,
-                    regency_id=facility.regency_id,
-                    regency_name=facility.regency.name if facility.regency else None,
+                    regency_id=facility.sub_district.regency_id if hasattr(facility, 'sub_district') and facility.sub_district else None,
+                    regency_name=facility.sub_district.regency.name if hasattr(facility, 'sub_district') and facility.sub_district and hasattr(facility.sub_district, 'regency') and facility.sub_district.regency else None,
                     sub_district_id=facility.subdistrict_id,
-                    sub_district_name=facility.subdistrict.name if facility.subdistrict else None
+                    sub_district_name=facility.sub_district.name if hasattr(facility, 'sub_district') and facility.sub_district else None
                 ))
             
             logger.info(f"Retrieved {len(facility_schemas)} facilities for regency {regency_id}")

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Float
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from app.src.config.database import Base
@@ -17,6 +18,9 @@ class Province(Base):
     
     # Area in square kilometers (calculated from geometry)
     area_km2 = Column(Float, nullable=True)
+    
+    # Relationship to Regencies
+    regencies = relationship("Regency", back_populates="province")
     
     # Geometry column to store the polygon shape of the province.
     # Using MULTIPOLYGON for 2D geometries (Z dimension stripped)

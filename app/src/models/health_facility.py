@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Enum, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from app.src.config.database import Base
@@ -24,6 +25,9 @@ class HealthFacility(Base):
 
     # Foreign key for quick administrative lookup, though spatial queries will be primary.
     subdistrict_id = Column(UUID(as_uuid=True), ForeignKey("subdistricts.id"), nullable=True)
+    
+    # Relationships
+    sub_district = relationship("Subdistrict", back_populates="health_facilities")
     
     # Geometry column to store the point location of the facility.
     geom = Column(Geometry('POINT', srid=4326), nullable=False)

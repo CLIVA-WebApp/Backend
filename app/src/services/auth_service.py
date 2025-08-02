@@ -230,3 +230,10 @@ class AuthService:
             return await self.user_service.update_user_location(user_id, location_data)
         except Exception as e:
             raise AuthenticationException(f"Failed to update user location: {str(e)}")
+    
+    async def update_user_name(self, user_id: str, name_data: dict) -> UserSchema:
+        """Update user name (first_name and last_name)"""
+        try:
+            return await self.user_service.update_user_name(user_id, name_data)
+        except Exception as e:
+            raise AuthenticationException(f"Failed to update user name: {str(e)}")

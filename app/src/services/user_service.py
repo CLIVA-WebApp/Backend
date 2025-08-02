@@ -240,3 +240,28 @@ class UserService:
             
         except Exception as e:
             raise DatabaseException(f"Error finding users by proximity: {str(e)}")
+    
+    async def update_user_name(self, user_id: str, name_data: dict) -> UserSchema:
+        """Update user name (first_name and last_name)"""
+        try:
+            update_data = {
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Add name fields if provided
+            if "first_name" in name_data and name_data["first_name"] is not None:
+                update_data["first_name"] = name_data["first_name"].strip()
+            
+            if "last_name" in name_data and name_data["last_name"] is not None:
+                update_data["last_name"] = name_data["last_name"].strip()
+            
+            result = self.supabase.table("users").update(update_data).eq("id", user_id).execute()
+            
+            if result.data:
+                updated_user = result.data[0]
+                return UserSchema(**updated_user)
+            else:
+                raise DatabaseException("Failed to update user name")
+                
+        except Exception as e:
+            raise DatabaseException(f"Error updating user name: {str(e)}")

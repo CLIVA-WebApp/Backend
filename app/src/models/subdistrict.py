@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Float, ForeignKey, Integer
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from app.src.config.database import Base
@@ -16,6 +17,12 @@ class Subdistrict(Base):
     name = Column(String, nullable=False, index=True)
     
     regency_id = Column(UUID(as_uuid=True), ForeignKey("regencies.id"), nullable=False)
+    
+    # Relationship to Regency
+    regency = relationship("Regency", back_populates="subdistricts")
+    
+    # Relationship to Health Facilities
+    health_facilities = relationship("HealthFacility", back_populates="sub_district")
     
     # Demographic data, to be joined from BPS sources.
     population_count = Column(Integer, nullable=True)

@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi.responses import RedirectResponse
 from app.src.config.settings import settings
 from app.src.services.auth_service import AuthService
-from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange, UserLocationUpdate
+from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange, UserLocationUpdate, UserNameUpdate
 from app.src.middleware.auth_middleware import get_current_user_required
 from app.src.utils.exceptions import AuthenticationException
 from app.src.schemas.auth_schema import (
@@ -247,6 +247,62 @@ class AuthController:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Location update failed: {str(e)}"
+            )
+    
+    async def update_user_name(
+        self, 
+        name_data: UserNameUpdate,
+        current_user: UserSchema = Depends(get_current_user_required)
+    ) -> dict:
+        """Update user name (first_name and last_name) - OAuth users cannot update names"""
+        try:
+            # Check if user is OAuth user (Google)
+            if current_user.provider == "google":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="OAuth users cannot update their names. Names are managed by your Google account."
+                )
+            
+            # Convert name data to dict, excluding None values
+            name_dict = {}
+            if name_data.first_name is not None:
+                name_dict["first_name"] = name_data.first_name
+            if name_data.last_name is not None:
+                name_dict["last_name"] = name_data.last_name
+            
+            # Check if at least one field is provided
+            if not name_dict:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="At least one name field (first_name or last_name) must be provided"
+                )
+            
+            updated_user = await self.auth_service.update_user_name(str(current_user.id), name_dict)
+            
+            return {
+                "message": "Name updated successfully",
+                "user": {
+                    "id": str(updated_user.id),
+                    "email": updated_user.email,
+                    "username": updated_user.username,
+                    "first_name": updated_user.first_name,
+                    "last_name": updated_user.last_name,
+                    "provider": updated_user.provider,
+                    "is_active": updated_user.is_active
+                }
+            }
+        
+        except HTTPException:
+            raise
+        except AuthenticationException as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Name update failed: {str(e)}"
             )
 
 # Create controller instance

@@ -73,17 +73,36 @@ class SubDistrictDetails(BaseModel):
 # Simulation Schemas
 class SimulationRequest(BaseModel):
     regency_id: Union[UUID, str] = Field(..., description="ID of the regency for simulation (use 'mock' for testing)")
-    budget: float = Field(..., gt=0, description="Available budget in currency units")
-    facility_type: str = Field(..., description="Type of health facility to optimize")
-    optimization_criteria: List[str] = Field(
-        default=["population_coverage", "cost_efficiency"],
-        description="Optimization criteria to consider"
+    budget: float = Field(..., gt=0, description="Available budget in Indonesian Rupiah (IDR)")
+    facility_costs: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Custom facility costs in IDR (e.g., {'Puskesmas': 2000000000, 'Pustu': 500000000})"
+    )
+    coverage_radius: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Custom coverage radius in meters (e.g., {'Puskesmas': 5000, 'Pustu': 3000})"
     )
     
     @validator('budget')
     def validate_budget(cls, v):
         if v <= 0:
             raise ValueError('Budget must be greater than 0')
+        return v
+    
+    @validator('facility_costs')
+    def validate_facility_costs(cls, v):
+        if v is not None:
+            for facility_type, cost in v.items():
+                if cost <= 0:
+                    raise ValueError(f'Cost for {facility_type} must be greater than 0')
+        return v
+    
+    @validator('coverage_radius')
+    def validate_coverage_radius(cls, v):
+        if v is not None:
+            for facility_type, radius in v.items():
+                if radius <= 0:
+                    raise ValueError(f'Coverage radius for {facility_type} must be greater than 0')
         return v
 
 class OptimizedFacility(BaseModel):
@@ -107,6 +126,32 @@ class SimulationResult(BaseModel):
     total_population_covered: int = Field(..., description="Total population covered")
     coverage_percentage: float = Field(..., description="Percentage of population covered")
     optimized_facilities: List[OptimizedFacility] = Field(..., description="List of optimal facility locations")
+    
+    class Config:
+        from_attributes = True
+
+# Summary Analysis Schemas
+class SummaryMetrics(BaseModel):
+    coverage_percentage: float = Field(..., description="The proportion of the population covered by health facilities")
+    average_distance_km: float = Field(..., description="Average distance to the nearest facility in kilometers")
+    average_travel_time_hours: float = Field(..., description="Average travel time to the nearest facility in hours")
+    
+    class Config:
+        from_attributes = True
+
+class FacilityOverview(BaseModel):
+    id: UUID = Field(..., description="ID of the health facility")
+    name: str = Field(..., description="Name of the health facility")
+    type: str = Field(..., description="Type of health facility")
+    rating: float = Field(..., description="Rating of the facility (0-5 scale)")
+    
+    class Config:
+        from_attributes = True
+
+class AnalysisSummary(BaseModel):
+    regency_name: str = Field(..., description="Name of the regency")
+    summary_metrics: SummaryMetrics = Field(..., description="Summary metrics for the regency")
+    facility_overview: List[FacilityOverview] = Field(..., description="Overview of health facilities in the regency")
     
     class Config:
         from_attributes = True

@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from typing import Optional, Dict, Any
 from app.src.config.settings import settings
 from app.src.controllers.auth_controller import auth_controller
-from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange, UserLocationUpdate
+from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange, UserLocationUpdate, UserNameUpdate
 from app.src.middleware.auth_middleware import get_current_user_required
 from app.src.schemas.auth_schema import (
     GoogleAuthResponse, 
@@ -87,3 +87,11 @@ async def update_user_location(
 ):
     """Update user location (address and/or geometry)"""
     return await auth_controller.update_user_location(location_data, current_user)
+
+@auth_router.put("/name", summary="Update User Name")
+async def update_user_name(
+    name_data: UserNameUpdate,
+    current_user: UserSchema = Depends(get_current_user_required)
+):
+    """Update user name (first_name and last_name) - OAuth users cannot update names"""
+    return await auth_controller.update_user_name(name_data, current_user)

@@ -90,13 +90,6 @@ Retrieve all sub-districts (Kecamatan) within a specific regency.
       "code": "320101",
       "regency_id": "3201",
       "regency_name": "Kabupaten Bogor"
-    },
-    {
-      "id": "320102",
-      "name": "Kecamatan Gunung Putri",
-      "code": "320102",
-      "regency_id": "3201",
-      "regency_name": "Kabupaten Bogor"
     }
   ],
   "total": 2,
@@ -215,7 +208,7 @@ Deliver the Equity Prioritization Score.
 
 Retrieve detailed statistics for a specific sub-district.
 
-**Purpose**: Provides comprehensive information about a sub-district when users click on it for detailed analysis.
+**Purpose**: Provides comprehensive information about a sub-district including population, area, poverty rate, existing facilities, and calculated scores.
 
 **Authentication**: Required
 
@@ -229,32 +222,61 @@ Retrieve detailed statistics for a specific sub-district.
   "sub_district_name": "Kecamatan Cibinong",
   "regency_id": "3201",
   "regency_name": "Kabupaten Bogor",
-  "population": 25000,
-  "area_km2": 45.5,
-  "population_density": 549.45,
+  "population": 150000,
+  "area_km2": 45.2,
+  "population_density": 3318.58,
   "poverty_rate": 12.5,
   "existing_facilities_count": 2,
   "existing_facilities": [
     {
-      "id": "F001",
       "name": "Puskesmas Cibinong",
-      "type": "puskesmas",
-      "latitude": -6.4815,
-      "longitude": 106.8540
-    },
-    {
-      "id": "F002",
-      "name": "RSUD Cibinong",
-      "type": "hospital",
+      "type": "Puskesmas",
       "latitude": -6.4815,
       "longitude": 106.8540
     }
   ],
-  "gap_factor": 0.8,
-  "efficiency_factor": 0.6,
-  "vulnerability_factor": 0.7,
-  "composite_score": 0.71,
+  "gap_factor": 0.75,
+  "efficiency_factor": 0.65,
+  "vulnerability_factor": 0.80,
+  "composite_score": 0.73,
   "rank": 1
+}
+```
+
+#### GET /api/v1/analysis/summary?regency_id={id}
+
+Get a comprehensive analysis summary for a regency.
+
+**Purpose**: Provides a high-level overview of health access in a regency including coverage metrics, average distances, and facility overview.
+
+**Authentication**: Required
+
+**Parameters**:
+- `regency_id` (required): ID of the regency for summary analysis
+
+**Response**:
+```json
+{
+  "regency_name": "Kabupaten Bandung",
+  "summary_metrics": {
+    "coverage_percentage": 68.5,
+    "average_distance_km": 4.7,
+    "average_travel_time_hours": 1.2
+  },
+  "facility_overview": [
+    {
+      "id": "uuid-facility-1",
+      "name": "RS. Borromeus",
+      "type": "Hospital",
+      "rating": 4.8
+    },
+    {
+      "id": "uuid-facility-2",
+      "name": "Klinik Medika",
+      "type": "Clinic",
+      "rating": 4.5
+    }
+  ]
 }
 ```
 

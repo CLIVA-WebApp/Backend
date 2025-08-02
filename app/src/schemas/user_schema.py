@@ -67,6 +67,29 @@ class UserLocationUpdate(BaseModel):
             raise ValueError('Address must be at least 5 characters long')
         return v
 
+class UserNameUpdate(BaseModel):
+    """Schema for updating user name (first_name and last_name)"""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    
+    @validator('first_name')
+    def validate_first_name(cls, v):
+        if v is not None:
+            v = v.strip()
+            if len(v) < 1:
+                raise ValueError('First name cannot be empty')
+            if len(v) > 50:
+                raise ValueError('First name cannot exceed 50 characters')
+        return v
+    
+    @validator('last_name')
+    def validate_last_name(cls, v):
+        if v is not None:
+            v = v.strip()
+            if len(v) > 50:
+                raise ValueError('Last name cannot exceed 50 characters')
+        return v
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

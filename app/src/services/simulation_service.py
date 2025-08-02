@@ -1,179 +1,115 @@
-from typing import List, Optional, Dict, Any
-from app.src.schemas.analysis_schema import (
-    SimulationResult,
-    OptimizedFacility
-)
-from app.src.schemas.region_schema import RegencySchema
+from typing import List, Dict, Any, Optional, Tuple, Union
+from app.src.schemas.analysis_schema import OptimizedFacility, SimulationResult
 from app.src.config.database import SessionLocal
 from app.src.models.regency import Regency
+from app.src.models.subdistrict import Subdistrict
+from app.src.models.health_facility import HealthFacility
+from app.src.models.population_point import PopulationPoint
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import haversine_distances
 import math
-import random
 from uuid import UUID
+import random
 
 logger = logging.getLogger(__name__)
 
 class SimulationService:
     def __init__(self):
         self.db: Session = SessionLocal()
+        
+        # Default facility costs (in Indonesian Rupiah)
+        self.facility_costs = {
+            'Puskesmas': 2_000_000_000,  # 2 Billion IDR
+            'Pustu': 500_000_000,        # 500 Million IDR
+        }
+        
+        # Coverage radius for each facility type (in meters)
+        self.coverage_radius = {
+            'Puskesmas': 5000,  # 5km
+            'Pustu': 3000,      # 3km
+        }
     
-    async def get_regency_by_id(self, regency_id: UUID) -> Optional[RegencySchema]:
+    def set_facility_costs(self, costs: Dict[str, int]):
         """
-        Retrieve a specific regency by ID.
+        Set custom facility costs.
         
         Args:
-            regency_id: The unique identifier of the regency
-            
+            costs: Dictionary with facility type as key and cost in IDR as value
+        """
+        self.facility_costs.update(costs)
+        logger.info(f"Updated facility costs: {self.facility_costs}")
+    
+    def set_coverage_radius(self, radius: Dict[str, int]):
+        """
+        Set custom coverage radius for facility types.
+        
+        Args:
+            radius: Dictionary with facility type as key and radius in meters as value
+        """
+        self.coverage_radius.update(radius)
+        logger.info(f"Updated coverage radius: {self.coverage_radius}")
+    
+    async def run_greedy_simulation(self, budget: float, regency_id: Union[UUID, str]) -> SimulationResult:
+        """
+        Run greedy simulation for facility placement optimization.
+        
+        Args:
+            budget: Available budget in IDR
+            regency_id: ID of the regency to optimize
+        
         Returns:
-            Optional[RegencySchema]: Regency data if found, None otherwise
+            SimulationResult with optimized facility recommendations
         """
         try:
             # Check if this is a mock request
             if str(regency_id) == "mock":
-                mock_regency = RegencySchema(
-                    id=UUID("550e8400-e29b-41d4-a716-446655440002"),
-                    name="Kabupaten Bogor",
-                    pum_code="3201",
-                    province_id=UUID("550e8400-e29b-41d4-a716-446655440001"),
-                    province_name="Jawa Barat",
-                    area_km2=2985.43
-                )
-                return mock_regency
+                return self._generate_mock_simulation_result(budget)
             
+            # Get regency info
             regency = self.db.query(Regency).filter(Regency.id == regency_id).first()
-            
             if not regency:
-                return None
+                raise ValueError(f"Regency with ID {regency_id} not found")
             
-            regency_schema = RegencySchema(
-                id=regency.id,
-                name=regency.name,
-                pum_code=regency.pum_code,
-                province_id=regency.province_id,
-                province_name=regency.province.name if regency.province else None,
-                area_km2=regency.area_km2
+            # Get all population points in the regency
+            population_points = self._get_population_points(regency_id)
+            if not population_points:
+                raise ValueError(f"No population points found for regency {regency_id}")
+            
+            # Get existing health facilities
+            existing_facilities = self._get_existing_facilities(regency_id)
+            
+            # Identify underserved population points
+            underserved_points = self._identify_underserved_points(
+                population_points, existing_facilities
             )
             
-            return regency_schema
-        except Exception as e:
-            logger.error(f"Error retrieving regency {regency_id}: {str(e)}")
-            raise
-    
-    async def run_optimization_simulation(
-        self,
-        regency_id: UUID,
-        budget: float,
-        facility_type: str,
-        optimization_criteria: List[str]
-    ) -> SimulationResult:
-        """
-        Run optimization simulation for health facility placement.
-        
-        This method implements the "'What-If' Optimization Simulator" which:
-        1. Analyzes population distribution
-        2. Considers existing health facilities
-        3. Evaluates transportation infrastructure
-        4. Optimizes facility placement within budget constraints
-        5. Maximizes population coverage
-        
-        Args:
-            regency_id: The unique identifier of the regency
-            budget: Available budget in currency units
-            facility_type: Type of health facility to optimize
-            optimization_criteria: List of optimization criteria to consider
-            
-        Returns:
-            SimulationResult: Optimization results including recommended facility locations
-        """
-        try:
-            # Validate regency exists
-            regency = await self.get_regency_by_id(regency_id)
-            if not regency:
-                raise ValueError(f"Regency {regency_id} not found")
-            
-            # Check if this is a mock request
-            if str(regency_id) == "mock":
-                mock_simulation_result = SimulationResult(
-                    regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
-                    regency_name="Kabupaten Bogor",
+            if not underserved_points:
+                return SimulationResult(
+                    regency_id=regency_id,
+                    regency_name=regency.name,
                     total_budget=budget,
-                    budget_used=budget * 0.85,
-                    facilities_recommended=3,
-                    total_population_covered=450000,
-                    coverage_percentage=90.0,
-                    optimized_facilities=[
-                        OptimizedFacility(
-                            latitude=-6.4233,
-                            longitude=106.9073,
-                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
-                            sub_district_name="Kecamatan Gunung Putri",
-                            estimated_cost=budget * 0.3,
-                            population_covered=150000,
-                            coverage_radius_km=5.0
-                        ),
-                        OptimizedFacility(
-                            latitude=-6.4815,
-                            longitude=106.8540,
-                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
-                            sub_district_name="Kecamatan Cibinong",
-                            estimated_cost=budget * 0.35,
-                            population_covered=200000,
-                            coverage_radius_km=5.0
-                        ),
-                        OptimizedFacility(
-                            latitude=-6.5000,
-                            longitude=106.8000,
-                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
-                            sub_district_name="Kecamatan Cibinong",
-                            estimated_cost=budget * 0.2,
-                            population_covered=100000,
-                            coverage_radius_km=5.0
-                        )
-                    ]
+                    budget_used=0,
+                    facilities_recommended=0,
+                    total_population_covered=0,
+                    coverage_percentage=100.0,
+                    optimized_facilities=[]
                 )
-                return mock_simulation_result
             
-            # Mock optimization simulation
-            # In reality, this would involve complex algorithms
+            # Cluster underserved points to find candidate locations
+            candidate_locations = self._cluster_population_points(underserved_points)
             
-            # Calculate number of facilities based on budget
-            # Mock cost per facility
-            cost_per_facility = 5000000  # 5 million currency units
-            max_facilities = int(budget / cost_per_facility)
-            
-            # Generate mock optimized facilities
-            optimized_facilities = []
-            budget_used = 0
-            total_population_covered = 0
-            
-            for i in range(min(max_facilities, 3)):  # Mock 3 facilities max
-                # Mock facility location
-                lat = -6.2088 + (i * 0.02)  # Spread facilities
-                lng = 106.8456 + (i * 0.02)
-                
-                # Mock facility data
-                estimated_cost = cost_per_facility * (1 + random.uniform(-0.1, 0.1))
-                population_covered = random.randint(5000, 15000)
-                coverage_radius = random.uniform(3.0, 8.0)
-                
-                optimized_facilities.append(OptimizedFacility(
-                    latitude=lat,
-                    longitude=lng,
-                    sub_district_id=f"{regency_id}0{i+1}",
-                    sub_district_name=f"Kecamatan {i+1}",
-                    estimated_cost=estimated_cost,
-                    population_covered=population_covered,
-                    coverage_radius_km=coverage_radius
-                ))
-                
-                budget_used += estimated_cost
-                total_population_covered += population_covered
+            # Run greedy algorithm
+            optimized_facilities, budget_used, total_covered = self._run_greedy_algorithm(
+                candidate_locations, underserved_points, budget
+            )
             
             # Calculate coverage percentage
-            total_population = 50000  # Mock total population
-            coverage_percentage = (total_population_covered / total_population) * 100
+            total_population = sum(point['population_count'] for point in population_points)
+            coverage_percentage = (total_covered / total_population * 100) if total_population > 0 else 0
             
             return SimulationResult(
                 regency_id=regency_id,
@@ -181,69 +117,294 @@ class SimulationService:
                 total_budget=budget,
                 budget_used=budget_used,
                 facilities_recommended=len(optimized_facilities),
-                total_population_covered=total_population_covered,
+                total_population_covered=int(total_covered),
                 coverage_percentage=coverage_percentage,
                 optimized_facilities=optimized_facilities
             )
+            
         except Exception as e:
-            logger.error(f"Error running optimization simulation for regency {regency_id}: {str(e)}")
+            logger.error(f"Error running simulation for regency {regency_id}: {str(e)}")
             raise
     
-    def _calculate_distance(self, lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-        """
-        Calculate distance between two points using Haversine formula.
+    def _get_population_points(self, regency_id: Union[UUID, str]) -> List[Dict[str, Any]]:
+        """Get all population points in the regency."""
+        query = text("""
+            SELECT 
+                pp.id,
+                pp.population_count,
+                ST_X(pp.geom) as longitude,
+                ST_Y(pp.geom) as latitude,
+                pp.subdistrict_id
+            FROM population_points pp
+            JOIN subdistricts sd ON pp.subdistrict_id = sd.id
+            WHERE sd.regency_id = :regency_id
+        """)
         
-        Args:
-            lat1, lng1: Coordinates of first point
-            lat2, lng2: Coordinates of second point
-            
-        Returns:
-            float: Distance in kilometers
-        """
-        # Haversine formula implementation
-        R = 6371  # Earth's radius in kilometers
+        result = self.db.execute(query, {"regency_id": regency_id})
         
-        lat1_rad = math.radians(lat1)
-        lat2_rad = math.radians(lat2)
-        delta_lat = math.radians(lat2 - lat1)
-        delta_lng = math.radians(lng2 - lng1)
+        points = []
+        for row in result:
+            points.append({
+                'id': row.id,
+                'population_count': row.population_count,
+                'longitude': row.longitude,
+                'latitude': row.latitude,
+                'subdistrict_id': row.subdistrict_id
+            })
         
-        a = (
-            math.sin(delta_lat / 2) ** 2 +
-            math.cos(lat1_rad) * math.cos(lat2_rad) *
-            math.sin(delta_lng / 2) ** 2
-        )
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        
-        return R * c
+        return points
     
-    def _optimize_facility_placement(
-        self,
-        population_centers: List[Dict[str, Any]],
-        existing_facilities: List[Dict[str, Any]],
-        budget: float,
-        facility_type: str
-    ) -> List[OptimizedFacility]:
-        """
-        Optimize facility placement using advanced algorithms.
+    def _get_existing_facilities(self, regency_id: Union[UUID, str]) -> List[Dict[str, Any]]:
+        """Get existing health facilities in the regency."""
+        query = text("""
+            SELECT 
+                hf.id,
+                hf.name,
+                hf.type,
+                ST_X(hf.geom) as longitude,
+                ST_Y(hf.geom) as latitude
+            FROM health_facilities hf
+            JOIN subdistricts sd ON hf.subdistrict_id = sd.id
+            WHERE sd.regency_id = :regency_id
+        """)
         
-        This is a placeholder for the actual optimization algorithm.
-        In a real implementation, this would use sophisticated algorithms
-        like genetic algorithms, linear programming, or machine learning.
+        result = self.db.execute(query, {"regency_id": regency_id})
         
-        Args:
-            population_centers: List of population centers with coordinates and population
-            existing_facilities: List of existing health facilities
-            budget: Available budget
-            facility_type: Type of facility to optimize
+        facilities = []
+        for row in result:
+            facilities.append({
+                'id': row.id,
+                'name': row.name,
+                'type': row.type,
+                'longitude': row.longitude,
+                'latitude': row.latitude
+            })
+        
+        return facilities
+    
+    def _identify_underserved_points(self, population_points: List[Dict], 
+                                   existing_facilities: List[Dict]) -> List[Dict]:
+        """Identify population points that are not covered by existing facilities."""
+        underserved_points = []
+        
+        for point in population_points:
+            is_covered = False
             
-        Returns:
-            List[OptimizedFacility]: Optimized facility locations
-        """
-        # Placeholder implementation
-        # In reality, this would implement complex optimization algorithms
+            # Check if point is covered by any existing facility
+            for facility in existing_facilities:
+                distance = self._calculate_distance(
+                    point['latitude'], point['longitude'],
+                    facility['latitude'], facility['longitude']
+                )
+                
+                # Use the maximum coverage radius for existing facilities
+                max_radius = max(self.coverage_radius.values())
+                if distance <= max_radius:
+                    is_covered = True
+                    break
+            
+            if not is_covered:
+                underserved_points.append(point)
         
-        optimized_facilities = []
-        # Algorithm implementation would go here
+        return underserved_points
+    
+    def _cluster_population_points(self, points: List[Dict], n_clusters: int = 10) -> List[Dict]:
+        """Cluster population points to find candidate locations."""
+        if len(points) == 0:
+            return []
         
-        return optimized_facilities 
+        # Extract coordinates for clustering
+        coordinates = np.array([[p['latitude'], p['longitude']] for p in points])
+        
+        # Determine number of clusters (min of n_clusters or number of points)
+        n_clusters = min(n_clusters, len(points))
+        
+        if n_clusters == 1:
+            # If only one cluster, use the centroid of all points
+            centroid = np.mean(coordinates, axis=0)
+            return [{
+                'latitude': centroid[0],
+                'longitude': centroid[1],
+                'population_count': sum(p['population_count'] for p in points)
+            }]
+        
+        # Perform K-means clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(coordinates)
+        
+        # Create candidate locations from cluster centroids
+        candidates = []
+        for i in range(n_clusters):
+            cluster_points = [p for j, p in enumerate(points) if cluster_labels[j] == i]
+            centroid = kmeans.cluster_centers_[i]
+            
+            candidates.append({
+                'latitude': centroid[0],
+                'longitude': centroid[1],
+                'population_count': sum(p['population_count'] for p in cluster_points),
+                'cluster_points': cluster_points
+            })
+        
+        return candidates
+    
+    def _run_greedy_algorithm(self, candidate_locations: List[Dict], 
+                             underserved_points: List[Dict], budget: float) -> Tuple[List[OptimizedFacility], float, float]:
+        """Run greedy algorithm to select optimal facility locations."""
+        remaining_budget = budget
+        selected_facilities = []
+        covered_points = set()
+        total_covered = 0
+        
+        # Minimum cost to continue
+        min_cost = min(self.facility_costs.values())
+        
+        while remaining_budget >= min_cost and len(candidate_locations) > 0:
+            best_facility = None
+            best_coverage_increase = 0
+            best_cost_efficiency = 0
+            best_location = None
+            best_type = None
+            
+            # Evaluate each candidate location
+            for location in candidate_locations:
+                for facility_type, cost in self.facility_costs.items():
+                    if cost > remaining_budget:
+                        continue
+                    
+                    # Calculate coverage increase for this facility
+                    coverage_increase = self._calculate_coverage_increase(
+                        location, underserved_points, covered_points, facility_type
+                    )
+                    
+                    if coverage_increase > 0:
+                        cost_efficiency = coverage_increase / cost
+                        
+                        if cost_efficiency > best_cost_efficiency:
+                            best_cost_efficiency = cost_efficiency
+                            best_coverage_increase = coverage_increase
+                            best_location = location
+                            best_type = facility_type
+            
+            # If no improvement found, break
+            if best_location is None:
+                break
+            
+            # Add the best facility
+            facility = OptimizedFacility(
+                latitude=best_location['latitude'],
+                longitude=best_location['longitude'],
+                sub_district_id=best_location.get('subdistrict_id'),
+                sub_district_name=self._get_subdistrict_name(best_location.get('subdistrict_id')),
+                estimated_cost=self.facility_costs[best_type],
+                population_covered=int(best_coverage_increase),
+                coverage_radius_km=self.coverage_radius[best_type] / 1000
+            )
+            
+            selected_facilities.append(facility)
+            remaining_budget -= self.facility_costs[best_type]
+            total_covered += best_coverage_increase
+            
+            # Update covered points
+            self._update_covered_points(best_location, underserved_points, covered_points, best_type)
+            
+            # Remove the selected location from candidates
+            candidate_locations.remove(best_location)
+        
+        return selected_facilities, budget - remaining_budget, total_covered
+    
+    def _calculate_coverage_increase(self, location: Dict, underserved_points: List[Dict], 
+                                   covered_points: set, facility_type: str) -> float:
+        """Calculate the increase in population coverage for a facility at the given location."""
+        coverage_radius = self.coverage_radius[facility_type]
+        coverage_increase = 0
+        
+        for point in underserved_points:
+            if point['id'] in covered_points:
+                continue
+            
+            distance = self._calculate_distance(
+                location['latitude'], location['longitude'],
+                point['latitude'], point['longitude']
+            )
+            
+            if distance <= coverage_radius:
+                coverage_increase += point['population_count']
+        
+        return coverage_increase
+    
+    def _update_covered_points(self, location: Dict, underserved_points: List[Dict], 
+                             covered_points: set, facility_type: str):
+        """Update the set of covered points after adding a facility."""
+        coverage_radius = self.coverage_radius[facility_type]
+        
+        for point in underserved_points:
+            if point['id'] in covered_points:
+                continue
+            
+            distance = self._calculate_distance(
+                location['latitude'], location['longitude'],
+                point['latitude'], point['longitude']
+            )
+            
+            if distance <= coverage_radius:
+                covered_points.add(point['id'])
+    
+    def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculate distance between two points in meters using Haversine formula."""
+        # Convert to radians
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        
+        # Haversine formula
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        
+        # Earth's radius in meters
+        r = 6371000
+        return c * r
+    
+    def _get_subdistrict_name(self, subdistrict_id: Optional[UUID]) -> Optional[str]:
+        """Get subdistrict name by ID."""
+        if not subdistrict_id:
+            return None
+        
+        subdistrict = self.db.query(Subdistrict).filter(Subdistrict.id == subdistrict_id).first()
+        return subdistrict.name if subdistrict else None
+    
+    def _generate_mock_simulation_result(self, budget: float) -> SimulationResult:
+        """Generate mock simulation result for testing."""
+        mock_facilities = [
+            OptimizedFacility(
+                latitude=-6.4815,
+                longitude=106.8540,
+                sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                sub_district_name="Kecamatan Cibinong",
+                estimated_cost=2_000_000_000,
+                population_covered=50000,
+                coverage_radius_km=5.0
+            ),
+            OptimizedFacility(
+                latitude=-6.4233,
+                longitude=106.9073,
+                sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
+                sub_district_name="Kecamatan Gunung Putri",
+                estimated_cost=500_000_000,
+                population_covered=25000,
+                coverage_radius_km=3.0
+            )
+        ]
+        
+        budget_used = sum(f.estimated_cost for f in mock_facilities)
+        total_covered = sum(f.population_covered for f in mock_facilities)
+        
+        return SimulationResult(
+            regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+            regency_name="Kabupaten Bogor",
+            total_budget=budget,
+            budget_used=budget_used,
+            facilities_recommended=len(mock_facilities),
+            total_population_covered=total_covered,
+            coverage_percentage=85.5,
+            optimized_facilities=mock_facilities
+        ) 

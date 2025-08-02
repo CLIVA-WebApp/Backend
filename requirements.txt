@@ -20,3 +20,8 @@ geopandas
 fiona
 shapely
 requests
+fastapi-cache2[redis]
+redis
+scikit-learn
+numpy
+pydantic-settings

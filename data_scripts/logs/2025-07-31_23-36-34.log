@@ -1,6 +1,0 @@
-2025-07-31 23:36:36  [INFO]  Processing regency: Sleman (Province ID: 12bba251-7eb0-4157-a6e1-0bfdbf0e0595)
-2025-07-31 23:36:36  [INFO]  Trying URL: https://slemankab.bps.go.id/id/statistics-table?subject=519
-2025-07-31 23:36:38  [INFO]  Found popup, clicking 'Tutup' button to close it
-2025-07-31 23:36:43  [INFO]  Clicking matching row on slemankab
-2025-07-31 23:36:43  [INFO]  Navigated to data page: https://slemankab.bps.go.id/id/statistics-table?subject=519?year=2023
-2025-07-31 23:36:44  [INFO]  Unduh button not found

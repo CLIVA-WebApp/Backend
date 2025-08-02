@@ -64,12 +64,18 @@ async def run_simulation(
         if simulation_request.budget <= 0:
             raise ValidationException("Budget must be greater than 0")
         
-        # Run the optimization simulation
-        simulation_result = await simulation_service.run_optimization_simulation(
-            regency_id=simulation_request.regency_id,
+        # Set custom facility costs if provided
+        if hasattr(simulation_request, 'facility_costs') and simulation_request.facility_costs:
+            simulation_service.set_facility_costs(simulation_request.facility_costs)
+        
+        # Set custom coverage radius if provided
+        if hasattr(simulation_request, 'coverage_radius') and simulation_request.coverage_radius:
+            simulation_service.set_coverage_radius(simulation_request.coverage_radius)
+        
+        # Run the greedy simulation
+        simulation_result = await simulation_service.run_greedy_simulation(
             budget=simulation_request.budget,
-            facility_type=simulation_request.facility_type,
-            optimization_criteria=simulation_request.optimization_criteria
+            regency_id=simulation_request.regency_id
         )
         
         return simulation_result

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Float, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from app.src.config.database import Base
@@ -16,6 +17,12 @@ class Regency(Base):
     name = Column(String, nullable=False, index=True)
     
     province_id = Column(UUID(as_uuid=True), ForeignKey("provinces.id"), nullable=False)
+    
+    # Relationship to Province
+    province = relationship("Province", back_populates="regencies")
+    
+    # Relationship to Subdistricts
+    subdistricts = relationship("Subdistrict", back_populates="regency")
     
     # Area in square kilometers (calculated from geometry)
     area_km2 = Column(Float, nullable=True)
