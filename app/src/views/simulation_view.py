@@ -1,96 +1,88 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Optional, Union
-from app.src.schemas.analysis_schema import (
-    SimulationRequest,
-    SimulationResult
-)
-from app.src.schemas.user_schema import UserSchema
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Dict, Any
 from app.src.middleware.auth_middleware import get_current_user_required
-from app.src.services.simulation_service import SimulationService
-from app.src.utils.exceptions import NotFoundException, ValidationException
-from uuid import UUID
+from app.src.schemas.user_schema import UserSchema
 
-# Create router with prefix and tags
+from app.src.services.simulation_service import SimulationService
+from app.src.services.chatbot_service import ChatbotService
+from app.src.schemas.simulation_schema import SimulationRequest, SimulationResponse
+from app.src.utils.exceptions import ValidationException
+
+# Create router
 simulation_router = APIRouter(prefix="/simulation", tags=["Simulation"])
 
-# Initialize service
+# Initialize services
 simulation_service = SimulationService()
+chatbot_service = ChatbotService()
 
-@simulation_router.post(
-    "/run",
-    response_model=SimulationResult,
-    summary="Run Optimization Simulation",
-    description="Execute the 'What-If' Optimization Simulator. This endpoint takes a budget and a regency, runs the optimization algorithm, and returns the most cost-effective locations for new health facilities."
-)
-async def run_simulation(
-    simulation_request: SimulationRequest,
-    current_user: UserSchema = Depends(get_current_user_required)
-) -> SimulationResult:
+@simulation_router.post("/run", response_model=SimulationResponse)
+async def run_simulation(simulation_request: SimulationRequest, current_user: UserSchema = Depends(get_current_user_required)):
     """
-    Run optimization simulation for health facility placement.
+    Run a greedy simulation for healthcare facility placement optimization.
     
-    This endpoint executes the "'What-If' Optimization Simulator" which is the most
-    complex feature of the system. It takes a budget and a regency, runs sophisticated
-    optimization algorithms, and returns the most cost-effective locations for new
-    health facilities.
-    
-    The simulation considers multiple factors including:
-    - Population distribution and density
-    - Existing health facility locations
-    - Transportation infrastructure
-    - Cost constraints and budget allocation
-    - Coverage optimization
-    
-    The result provides actionable insights for health infrastructure planning
-    and resource allocation decisions.
+    This endpoint runs a greedy algorithm to optimize healthcare facility placement
+    within a given regency, considering budget constraints and population coverage.
     
     Args:
-        simulation_request: Contains regency_id, budget, facility_type, and optimization criteria
+        simulation_request: SimulationRequest containing budget and regency_id
+        current_user: Authenticated user (from access token)
         
-    For development testing, use regency_id="mock" in the request to get mock data.
+    Returns:
+        SimulationResponse with optimized facility recommendations and impact summary
     """
     try:
-        # Handle mock request
-        if str(simulation_request.regency_id) == "mock":
-            # Convert mock string to UUID for the service
-            simulation_request.regency_id = UUID("550e8400-e29b-41d4-a716-446655440002")
-        else:
-            # Validate regency exists for real requests
-            regency = await simulation_service.get_regency_by_id(simulation_request.regency_id)
-            if not regency:
-                raise NotFoundException(f"Regency with ID {simulation_request.regency_id} not found")
-        
-        # Validate budget constraints
+        # Validate input
         if simulation_request.budget <= 0:
             raise ValidationException("Budget must be greater than 0")
         
-        # Set custom facility costs if provided
-        if hasattr(simulation_request, 'facility_costs') and simulation_request.facility_costs:
-            simulation_service.set_facility_costs(simulation_request.facility_costs)
-        
-        # Set custom coverage radius if provided
-        if hasattr(simulation_request, 'coverage_radius') and simulation_request.coverage_radius:
-            simulation_service.set_coverage_radius(simulation_request.coverage_radius)
-        
-        # Run the greedy simulation
-        simulation_result = await simulation_service.run_greedy_simulation(
+        # Run simulation
+        simulation_result = simulation_service.run_greedy_simulation(
             budget=simulation_request.budget,
             regency_id=simulation_request.regency_id
         )
         
+        # Store simulation result for chatbot context (only for real simulations, not mock)
+        if str(simulation_request.regency_id) != "550e8400-e29b-41d4-a716-446655440002":  # Not mock
+            try:
+                # Convert simulation result to dict for storage
+                simulation_data = {
+                    "regency_id": str(simulation_result.regency_id),
+                    "regency_name": simulation_result.regency_name,
+                    "total_budget": simulation_result.total_budget,
+                    "budget_used": simulation_result.budget_used,
+                    "facilities_recommended": simulation_result.facilities_recommended,
+                    "total_population_covered": simulation_result.total_population_covered,
+                    "coverage_percentage": simulation_result.coverage_percentage,
+                    "automated_reasoning": simulation_result.automated_reasoning,
+                    "optimized_facilities": [
+                        {
+                            "latitude": facility.latitude,
+                            "longitude": facility.longitude,
+                            "sub_district_id": str(facility.sub_district_id),
+                            "sub_district_name": facility.sub_district_name,
+                            "estimated_cost": facility.estimated_cost,
+                            "population_covered": facility.population_covered,
+                            "coverage_radius_km": facility.coverage_radius_km,
+                            "facility_type": facility.facility_type.value
+                        }
+                        for facility in simulation_result.optimized_facilities
+                    ]
+                }
+                
+                await chatbot_service.store_simulation_result(
+                    simulation_result=simulation_data,
+                    regency_id=str(simulation_result.regency_id),
+                    regency_name=simulation_result.regency_name
+                )
+            except Exception as e:
+                # Log error but don't fail the simulation
+                print(f"Failed to store simulation result for chatbot: {e}")
+        
         return simulation_result
-    except NotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        
     except ValidationException as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=422, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to run simulation: {str(e)}"
-        ) 
+        raise HTTPException(status_code=500, detail=f"Simulation error: {str(e)}") 

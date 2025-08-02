@@ -25,3 +25,4 @@ redis
 scikit-learn
 numpy
 pydantic-settings
+groq

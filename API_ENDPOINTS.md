@@ -1,507 +1,546 @@
 # API Endpoints Documentation
 
-This document describes the API endpoints for the Health Access Analysis and Optimization System.
+## Authentication Endpoints
 
-## Authentication
+### Login
 
-All endpoints require authentication. The system uses cookie-based authentication with JWT tokens.
+**Endpoint**: `POST /api/v1/auth/login`
 
-## Base URL
+**Description**: Authenticate user and get access token.
 
-All endpoints are prefixed with `/api/v1`
-
-## Endpoints
-
-### Regions
-
-#### GET /api/v1/regions/provinces
-
-Retrieve a list of all provinces in Indonesia.
-
-**Purpose**: Foundational endpoint for populating dropdown menus in the frontend, allowing users to begin their analysis by selecting a province.
-
-**Authentication**: Required
-
-**Response**:
+**Request Body**:
 ```json
 {
-  "provinces": [
-    {
-      "id": "32",
-      "name": "Jawa Barat",
-      "code": "32"
-    },
-    {
-      "id": "31",
-      "name": "DKI Jakarta",
-      "code": "31"
-    }
-  ],
-  "total": 2
+  "email": "user@example.com",
+  "password": "password123"
 }
 ```
 
-#### GET /api/v1/regions/regencies?province_id={id}
-
-Retrieve all regencies (Kabupaten/Kota) within a specific province.
-
-**Purpose**: Next step in the user's journey, narrowing down the area of interest.
-
-**Authentication**: Required
-
-**Parameters**:
-- `province_id` (required): ID of the province to get regencies for
-
 **Response**:
 ```json
 {
-  "regencies": [
-    {
-      "id": "3201",
-      "name": "Kabupaten Bogor",
-      "code": "3201",
-      "province_id": "32",
-      "province_name": "Jawa Barat"
-    }
-  ],
-  "total": 1,
-  "province_id": "32"
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "email": "user@example.com",
+    "name": "John Doe"
+  }
 }
 ```
 
-#### GET /api/v1/regions/subdistricts?regency_id={id}
+## Region Endpoints
 
-Retrieve all sub-districts (Kecamatan) within a specific regency.
+### Get All Provinces
 
-**Purpose**: Provides detailed administrative boundaries for analysis and filtering.
+**Endpoint**: `GET /api/v1/regions/provinces`
 
-**Authentication**: Required
-
-**Parameters**:
-- `regency_id` (required): ID of the regency to get sub-districts for
+**Description**: Get all provinces in Indonesia.
 
 **Response**:
 ```json
-{
-  "sub_districts": [
-    {
-      "id": "320101",
-      "name": "Kecamatan Cibinong",
-      "code": "320101",
-      "regency_id": "3201",
-      "regency_name": "Kabupaten Bogor"
-    }
-  ],
-  "total": 2,
-  "regency_id": "3201"
-}
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "name": "DKI Jakarta",
+    "code": "31"
+  }
+]
 ```
 
-#### GET /api/v1/regions/facilities?regency_id={id}
+### Get Regencies by Province
 
-Retrieve all health facilities within a specific regency.
+**Endpoint**: `GET /api/v1/regions/provinces/{province_id}/regencies`
 
-**Purpose**: Provides the existing healthcare landscape for analysis and visualization.
-
-**Authentication**: Required
-
-**Parameters**:
-- `regency_id` (required): ID of the regency to get facilities for
+**Description**: Get all regencies within a specific province.
 
 **Response**:
 ```json
-{
-  "facilities": [
-    {
-      "id": "F001",
-      "name": "Puskesmas Cibinong",
-      "type": "puskesmas",
-      "latitude": -6.4815,
-      "longitude": 106.8540,
-      "regency_id": "3201",
-      "regency_name": "Kabupaten Bogor",
-      "sub_district_id": "320101",
-      "sub_district_name": "Kecamatan Cibinong"
-    },
-    {
-      "id": "F002",
-      "name": "RSUD Cibinong",
-      "type": "hospital",
-      "latitude": -6.4815,
-      "longitude": 106.8540,
-      "regency_id": "3201",
-      "regency_name": "Kabupaten Bogor",
-      "sub_district_id": "320101",
-      "sub_district_name": "Kecamatan Cibinong"
-    }
-  ],
-  "total": 2,
-  "regency_id": "3201"
-}
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440002",
+    "name": "Jakarta Selatan",
+    "code": "31.74"
+  }
+]
 ```
 
-### Analysis
+### Get Subdistricts by Regency
 
-#### GET /api/v1/analysis/heatmap?regency_id={id}
+**Endpoint**: `GET /api/v1/regions/regencies/{regency_id}/subdistricts`
 
-Calculate and return data needed to generate the Health Access Heatmap for a chosen regency.
+**Description**: Get all subdistricts within a specific regency.
 
-**Purpose**: Core feature endpoint that calculates health access scores based on the proportion of the population living outside a defined service radius of the nearest health facility.
+**Response**:
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "name": "Kecamatan Kebayoran Baru",
+    "code": "31.74.01"
+  }
+]
+```
 
-**Authentication**: Required
+### Get Health Facilities by Regency
+
+**Endpoint**: `GET /api/v1/regions/regencies/{regency_id}/facilities`
+
+**Description**: Get all health facilities within a specific regency.
+
+**Response**:
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440004",
+    "name": "Puskesmas Kebayoran Baru",
+    "type": "Puskesmas",
+    "latitude": -6.2088,
+    "longitude": 106.8456,
+    "subdistrict_id": "550e8400-e29b-41d4-a716-446655440003",
+    "subdistrict_name": "Kecamatan Kebayoran Baru"
+  }
+]
+```
+
+## Analysis Endpoints
+
+### Get Priority Scores
+
+**Endpoint**: `GET /api/v1/analysis/priority-scores?regency_id={id}&radius={km}&gap_weight={0-1}&efficiency_weight={0-1}&vulnerability_weight={0-1}`
+
+**Description**: Get priority scores for subdistricts within a regency based on gap, efficiency, and vulnerability factors.
 
 **Parameters**:
-- `regency_id` (required): ID of the regency for heatmap analysis
+- `regency_id` (required): UUID of the regency
+- `radius` (optional): Coverage radius in kilometers (default: 5)
+- `gap_weight` (optional): Weight for gap factor (default: 0.4)
+- `efficiency_weight` (optional): Weight for efficiency factor (default: 0.3)
+- `vulnerability_weight` (optional): Weight for vulnerability factor (default: 0.3)
+
+**Response**:
+```json
+[
+  {
+    "subdistrict_id": "550e8400-e29b-41d4-a716-446655440003",
+    "subdistrict_name": "Kecamatan Kebayoran Baru",
+    "gap_factor": 0.75,
+    "efficiency_factor": 0.85,
+    "vulnerability_factor": 0.60,
+    "composite_score": 0.73,
+    "rank": 1
+  }
+]
+```
+
+### Generate Heatmap Data
+
+**Endpoint**: `GET /api/v1/analysis/heatmap?regency_id={id}&grid_size={km}&search_radius={km}`
+
+**Description**: Generate heatmap data showing population density and healthcare access patterns.
+
+**Parameters**:
+- `regency_id` (required): UUID of the regency
+- `grid_size` (optional): Size of grid cells in kilometers (default: 2)
+- `search_radius` (optional): Search radius for population density calculation (default: 4)
 
 **Response**:
 ```json
 {
-  "regency_id": "3201",
-  "regency_name": "Kabupaten Bogor",
-  "total_population": 50000,
-  "population_outside_radius": 15000,
-  "service_radius_km": 5.0,
+  "total_population": 150000,
+  "population_outside_radius": 45000,
   "heatmap_points": [
     {
       "latitude": -6.2088,
       "longitude": 106.8456,
-      "population_density": 500.0,
-      "access_score": 0.8,
-      "distance_to_facility": 2.0
+      "population_density": 0.75,
+      "access_score": 0.45,
+      "distance_to_facility": 2.3
     }
   ]
 }
 ```
 
-#### GET /api/v1/analysis/priority-score?regency_id={id}
+### Get Analysis Summary
 
-Deliver the Equity Prioritization Score.
+**Endpoint**: `GET /api/v1/analysis/summary?regency_id={id}`
 
-**Purpose**: Returns a ranked list of sub-districts based on the composite score defined in the project brief (Gap Factor, Efficiency Factor, Vulnerability Factor).
-
-**Authentication**: Required
+**Description**: Get a comprehensive summary of healthcare access metrics for a regency.
 
 **Parameters**:
-- `regency_id` (required): ID of the regency for priority score analysis
+- `regency_id` (required): UUID of the regency
 
 **Response**:
 ```json
 {
-  "regency_id": "3201",
-  "regency_name": "Kabupaten Bogor",
-  "total_sub_districts": 5,
-  "sub_districts": [
-    {
-      "sub_district_id": "320101",
-      "sub_district_name": "Kecamatan Cibinong",
-      "gap_factor": 0.8,
-      "efficiency_factor": 0.6,
-      "vulnerability_factor": 0.7,
-      "composite_score": 0.71,
-      "rank": 1
-    }
-  ]
-}
-```
-
-#### GET /api/v1/analysis/subdistrict-details?subdistrict_id={id}
-
-Retrieve detailed statistics for a specific sub-district.
-
-**Purpose**: Provides comprehensive information about a sub-district including population, area, poverty rate, existing facilities, and calculated scores.
-
-**Authentication**: Required
-
-**Parameters**:
-- `subdistrict_id` (required): ID of the sub-district for detailed analysis
-
-**Response**:
-```json
-{
-  "sub_district_id": "320101",
-  "sub_district_name": "Kecamatan Cibinong",
-  "regency_id": "3201",
-  "regency_name": "Kabupaten Bogor",
-  "population": 150000,
-  "area_km2": 45.2,
-  "population_density": 3318.58,
-  "poverty_rate": 12.5,
-  "existing_facilities_count": 2,
-  "existing_facilities": [
-    {
-      "name": "Puskesmas Cibinong",
-      "type": "Puskesmas",
-      "latitude": -6.4815,
-      "longitude": 106.8540
-    }
-  ],
-  "gap_factor": 0.75,
-  "efficiency_factor": 0.65,
-  "vulnerability_factor": 0.80,
-  "composite_score": 0.73,
-  "rank": 1
-}
-```
-
-#### GET /api/v1/analysis/summary?regency_id={id}
-
-Get a comprehensive analysis summary for a regency.
-
-**Purpose**: Provides a high-level overview of health access in a regency including coverage metrics, average distances, and facility overview.
-
-**Authentication**: Required
-
-**Parameters**:
-- `regency_id` (required): ID of the regency for summary analysis
-
-**Response**:
-```json
-{
-  "regency_name": "Kabupaten Bandung",
+  "regency_name": "Jakarta Selatan",
   "summary_metrics": {
-    "coverage_percentage": 68.5,
-    "average_distance_km": 4.7,
-    "average_travel_time_hours": 1.2
+    "coverage_percentage": 75.5,
+    "average_distance_km": 3.2,
+    "average_travel_time_hours": 0.064
   },
   "facility_overview": [
     {
-      "id": "uuid-facility-1",
-      "name": "RS. Borromeus",
-      "type": "Hospital",
-      "rating": 4.8
-    },
-    {
-      "id": "uuid-facility-2",
-      "name": "Klinik Medika",
-      "type": "Clinic",
-      "rating": 4.5
+      "id": "550e8400-e29b-41d4-a716-446655440004",
+      "name": "Puskesmas Kebayoran Baru",
+      "type": "Puskesmas",
+      "rating": 4.2
     }
   ]
 }
 ```
 
-### Simulation
+## Simulation Endpoints
 
-#### POST /api/v1/simulation/run
+### Run Simulation
 
-Execute the "'What-If' Optimization Simulator".
+**Endpoint**: `POST /api/v1/simulation/run`
 
-**Purpose**: Most complex endpoint that takes a budget and a regency, runs the optimization algorithm, and returns the most cost-effective locations for new health facilities.
-
-**Authentication**: Required
+**Description**: Run a greedy simulation for healthcare facility placement optimization.
 
 **Request Body**:
 ```json
 {
-  "regency_id": "3201",
-  "budget": 10000000,
-  "facility_type": "puskesmas",
-  "optimization_criteria": [
-    "population_coverage",
-    "cost_efficiency"
-  ]
+  "budget": 5000000000,
+  "regency_id": "550e8400-e29b-41d4-a716-446655440002"
 }
 ```
 
 **Response**:
 ```json
 {
-  "regency_id": "3201",
-  "regency_name": "Kabupaten Bogor",
-  "total_budget": 10000000,
-  "budget_used": 8500000,
-  "facilities_recommended": 2,
-  "total_population_covered": 25000,
-  "coverage_percentage": 50.0,
+  "regency_id": "550e8400-e29b-41d4-a716-446655440002",
+  "regency_name": "Jakarta Selatan",
+  "total_budget": 5000000000,
+  "budget_used": 4500000000,
+  "facilities_recommended": 3,
+  "total_population_covered": 150000,
+  "coverage_percentage": 75.5,
+  "automated_reasoning": "The greedy algorithm analyzed Jakarta Selatan and allocated 4,500,000,000 IDR (90.0% of total budget) to recommend 3 facilities, achieving 75.5% population coverage for 150,000 people. The algorithm prioritized cost-effectiveness by recommending 2 Puskesmas and 1 Pustu facilities based on population density and coverage gaps in underserved areas.",
   "optimized_facilities": [
     {
       "latitude": -6.2088,
       "longitude": 106.8456,
-      "sub_district_id": "320101",
-      "sub_district_name": "Kecamatan Cibinong",
-      "estimated_cost": 4250000,
-      "population_covered": 12500,
-      "coverage_radius_km": 5.0
+      "sub_district_id": "550e8400-e29b-41d4-a716-446655440003",
+      "sub_district_name": "Kecamatan Kebayoran Baru",
+      "estimated_cost": 2000000000,
+      "population_covered": 50000,
+      "coverage_radius_km": 5.0,
+      "facility_type": "Puskesmas"
     }
   ]
 }
 ```
 
-### Reports
+## Chatbot Endpoints
 
-#### POST /api/v1/reports/export
+### Start Chat Session
 
-Generate a downloadable report (PDF/CSV) from analysis or simulation results.
+**Endpoint**: `POST /api/v1/chatbot/start_chat`
 
-**Purpose**: Creates formatted reports for budget proposals and stakeholder presentations.
+**Description**: Start a new chat session with Ceeva chatbot. This endpoint initializes a new chat session and returns an initial greeting along with recent simulation results for context.
 
-**Authentication**: Required
+**Headers**: 
+- `Authorization: Bearer {access_token}` (required)
+
+**Response**:
+```json
+{
+  "bot_response": "Hello! I'm Ceeva, your healthcare facility planning assistant. I can help you analyze healthcare access patterns, interpret simulation results, and provide insights on facility placement optimization. How can I assist you today?",
+  "recent_simulations": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "regency_id": "550e8400-e29b-41d4-a716-446655440002",
+      "regency_name": "Jakarta Selatan",
+      "budget": 5000000000,
+      "facilities_recommended": 3,
+      "total_population_covered": 150000,
+      "coverage_percentage": 75.5,
+      "created_at": "2024-01-15T10:30:00"
+    }
+  ],
+  "suggested_actions": [
+    {
+      "action_type": "explain_simulation",
+      "description": "Explain simulation results in detail"
+    },
+    {
+      "action_type": "analyze_budget",
+      "description": "Analyze budget allocation and efficiency"
+    },
+    {
+      "action_type": "explain_coverage",
+      "description": "Explain coverage patterns and gaps"
+    },
+    {
+      "action_type": "analyze_facilities",
+      "description": "Analyze recommended facility locations"
+    },
+    {
+      "action_type": "explain_algorithm",
+      "description": "Explain the greedy algorithm's reasoning"
+    }
+  ]
+}
+```
+
+### Assist User
+
+**Endpoint**: `POST /api/v1/chatbot/assist`
+
+**Description**: Get intelligent assistance from Ceeva, the healthcare facility planning chatbot. The chatbot can analyze simulation results, provide insights, and suggest relevant actions.
+
+**Headers**: 
+- `Authorization: Bearer {access_token}` (required)
 
 **Request Body**:
 ```json
 {
-  "report_type": "simulation_results",
-  "data": {
-    "regency_id": "3201",
-    "regency_name": "Kabupaten Bogor",
-    "total_budget": 10000000,
-    "budget_used": 8500000,
-    "facilities_recommended": 2,
-    "total_population_covered": 25000,
-    "coverage_percentage": 50.0,
-    "optimized_facilities": []
-  },
-  "format": "csv"
+  "user_message": "Can you help me understand the simulation results?",
+  "session_context": {
+    "last_simulation_result": {
+      "regency_name": "Jakarta Selatan",
+      "budget_used": 5000000000,
+      "facilities_recommended": 3,
+      "coverage_percentage": 75.5
+    },
+    "previous_messages": [
+      {
+        "role": "user",
+        "content": "Hello Ceeva"
+      },
+      {
+        "role": "bot",
+        "content": "Hello! How can I help you with healthcare facility planning?"
+      }
+    ]
+  }
 }
 ```
 
 **Response**:
 ```json
 {
-  "filename": "simulation_results_20231201_143022.csv",
-  "download_url": "/api/v1/reports/download/simulation_results_20231201_143022.csv",
-  "file_size_bytes": 2048,
-  "generated_at": "2023-12-01T14:30:22"
+  "bot_response": "Based on your simulation results for Jakarta Selatan, I can see that you've allocated 5 billion IDR and achieved 75.5% population coverage with 3 recommended facilities. This is a good coverage rate, but there might be room for optimization. Let me suggest some actions to help you understand the results better.",
+  "suggested_actions": [
+    {
+      "action_type": "explain_simulation",
+      "description": "Explain simulation results in detail",
+      "parameters": null
+    },
+    {
+      "action_type": "analyze_budget",
+      "description": "Analyze budget allocation and efficiency",
+      "parameters": null
+    },
+    {
+      "action_type": "explain_coverage",
+      "description": "Explain coverage patterns and gaps",
+      "parameters": null
+    },
+    {
+      "action_type": "analyze_facilities",
+      "description": "Analyze recommended facility locations",
+      "parameters": null
+    },
+    {
+      "action_type": "explain_algorithm",
+      "description": "Explain the greedy algorithm's reasoning",
+      "parameters": null
+    }
+  ]
 }
 ```
 
-**Supported Report Types**:
-- `simulation_results`: Results from optimization simulation
-- `priority_ranking`: Sub-district priority rankings
-- `heatmap_analysis`: Health access heatmap data
-- `subdistrict_details`: Detailed sub-district statistics
+### Get Recent Simulations
 
-**Supported Formats**:
-- `pdf`: Portable Document Format
-- `csv`: Comma-Separated Values
+**Endpoint**: `GET /api/v1/chatbot/recent-simulations`
+
+**Description**: Get recent simulation results that can be used as context for chatbot conversations.
+
+**Headers**: 
+- `Authorization: Bearer {access_token}` (required)
+
+**Response**:
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "regency_id": "550e8400-e29b-41d4-a716-446655440002",
+    "regency_name": "Jakarta Selatan",
+    "budget": 5000000000,
+    "facilities_recommended": 3,
+    "total_population_covered": 150000,
+    "coverage_percentage": 75.5,
+    "created_at": "2024-01-15T10:30:00"
+  }
+]
+```
+
+## Reports Endpoints
+
+### Generate Report
+
+**Endpoint**: `POST /api/v1/reports/generate`
+
+**Description**: Generate comprehensive reports for healthcare facility planning.
+
+**Request Body**:
+```json
+{
+  "report_type": "comprehensive",
+  "regency_id": "550e8400-e29b-41d4-a716-446655440002",
+  "include_analysis": true,
+  "include_simulation": true
+}
+```
+
+**Response**:
+```json
+{
+  "report_id": "550e8400-e29b-41d4-a716-446655440005",
+  "download_url": "/api/v1/reports/download/550e8400-e29b-41d4-a716-446655440005",
+  "generated_at": "2024-01-15T10:30:00"
+}
+```
+
+## Frontend Integration Examples
+
+### Starting a Chat Session
+
+```javascript
+// Start a new chat session
+const startChat = async () => {
+  try {
+    const response = await fetch('/api/v1/chatbot/start_chat', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    // Display initial greeting
+    displayMessage('bot', data.bot_response);
+    
+    // Show recent simulations
+    if (data.recent_simulations.length > 0) {
+      displayRecentSimulations(data.recent_simulations);
+    }
+    
+    // Show suggested actions
+    displaySuggestedActions(data.suggested_actions);
+    
+  } catch (error) {
+    console.error('Error starting chat:', error);
+  }
+};
+```
+
+### Sending a Message to Chatbot
+
+```javascript
+// Send a message to the chatbot
+const sendMessage = async (message, sessionContext = null) => {
+  try {
+    const response = await fetch('/api/v1/chatbot/assist', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_message: message,
+        session_context: sessionContext
+      })
+    });
+    
+    const data = await response.json();
+    
+    // Display bot response
+    displayMessage('bot', data.bot_response);
+    
+    // Show suggested actions
+    displaySuggestedActions(data.suggested_actions);
+    
+  } catch (error) {
+    console.error('Error sending message:', error);
+  }
+};
+```
+
+### Running a Simulation
+
+```javascript
+// Run a simulation and automatically store for chatbot context
+const runSimulation = async (budget, regencyId) => {
+  try {
+    const response = await fetch('/api/v1/simulation/run', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        budget: budget,
+        regency_id: regencyId
+      })
+    });
+    
+    const data = await response.json();
+    
+    // Display simulation results
+    displaySimulationResults(data);
+    
+    // The simulation result is automatically stored for chatbot context
+    // You can now ask the chatbot about this simulation
+    
+  } catch (error) {
+    console.error('Error running simulation:', error);
+  }
+};
+```
 
 ## Error Responses
 
-All endpoints return consistent error responses:
+All endpoints may return the following error responses:
 
 ### 401 Unauthorized
 ```json
 {
-  "detail": "Authentication required",
-  "type": "authentication_error"
-}
-```
-
-### 404 Not Found
-```json
-{
-  "detail": "Regency with ID 9999 not found",
-  "type": "not_found_error"
+  "detail": "Not authenticated"
 }
 ```
 
 ### 422 Validation Error
 ```json
 {
-  "detail": "Budget must be greater than 0",
-  "type": "validation_error"
+  "detail": "Validation error message"
+}
+```
+
+### 404 Not Found
+```json
+{
+  "detail": "Resource not found"
 }
 ```
 
 ### 500 Internal Server Error
 ```json
 {
-  "detail": "Database operation failed",
-  "type": "database_error"
+  "detail": "Internal server error message"
 }
 ```
 
-## Usage Examples
+## Authentication
 
-### Frontend Integration
+Most endpoints require authentication. Include the access token in the Authorization header:
 
-```javascript
-// Get provinces for dropdown
-const response = await fetch('/api/v1/regions/provinces', {
-  credentials: 'include'
-});
-const provinces = await response.json();
-
-// Get regencies for selected province
-const regenciesResponse = await fetch(`/api/v1/regions/regencies?province_id=${selectedProvinceId}`, {
-  credentials: 'include'
-});
-const regencies = await regenciesResponse.json();
-
-// Get sub-districts for selected regency
-const subdistrictsResponse = await fetch(`/api/v1/regions/subdistricts?regency_id=${selectedRegencyId}`, {
-  credentials: 'include'
-});
-const subdistricts = await subdistrictsResponse.json();
-
-// Get facilities for selected regency
-const facilitiesResponse = await fetch(`/api/v1/regions/facilities?regency_id=${selectedRegencyId}`, {
-  credentials: 'include'
-});
-const facilities = await facilitiesResponse.json();
-
-// Generate heatmap for selected regency
-const heatmapResponse = await fetch(`/api/v1/analysis/heatmap?regency_id=${selectedRegencyId}`, {
-  credentials: 'include'
-});
-const heatmapData = await heatmapResponse.json();
-
-// Get priority scores for selected regency
-const priorityResponse = await fetch(`/api/v1/analysis/priority-score?regency_id=${selectedRegencyId}`, {
-  credentials: 'include'
-});
-const priorityData = await priorityResponse.json();
-
-// Get detailed information for a specific sub-district
-const detailsResponse = await fetch(`/api/v1/analysis/subdistrict-details?subdistrict_id=${selectedSubdistrictId}`, {
-  credentials: 'include'
-});
-const subdistrictDetails = await detailsResponse.json();
-
-// Run optimization simulation
-const simulationResponse = await fetch('/api/v1/simulation/run', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  credentials: 'include',
-  body: JSON.stringify({
-    regency_id: selectedRegencyId,
-    budget: 10000000,
-    facility_type: 'puskesmas',
-    optimization_criteria: ['population_coverage', 'cost_efficiency']
-  })
-});
-const simulationResult = await simulationResponse.json();
-
-// Export simulation results as CSV
-const exportResponse = await fetch('/api/v1/reports/export', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  credentials: 'include',
-  body: JSON.stringify({
-    report_type: 'simulation_results',
-    data: simulationResult,
-    format: 'csv'
-  })
-});
-const exportResult = await exportResponse.json();
+```
+Authorization: Bearer {access_token}
 ```
 
-## Implementation Notes
-
-- All endpoints use Pydantic models for request/response validation
-- Authentication is handled via cookie-based JWT tokens
-- Database queries are currently mocked but structured for easy integration with real data
-- Error handling is consistent across all endpoints
-- The API follows RESTful conventions
-- All endpoints are documented with OpenAPI/Swagger at `/docs`
-- Report generation creates files in a `reports/` directory
-- The API structure is now ready for:
-  1. **Frontend Integration**: All endpoints are documented with examples
-  2. **Database Integration**: Service layer is structured for easy database integration
-  3. **Real Algorithm Implementation**: Placeholder methods are ready for actual optimization algorithms
-  4. **Testing**: Basic test structure is in place
-  5. **Report Generation**: CSV and PDF report generation is implemented 
+The access token is obtained from the login endpoint and should be included in all subsequent requests. 

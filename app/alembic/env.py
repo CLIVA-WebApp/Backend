@@ -20,6 +20,8 @@ from app.src.models.regency import Regency
 from app.src.models.subdistrict import Subdistrict
 from app.src.models.population_point import PopulationPoint
 from app.src.models.health_facility import HealthFacility
+from app.src.models.simulation_result import SimulationResult
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

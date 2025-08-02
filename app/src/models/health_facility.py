@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, Enum, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
+from sqlalchemy.types import Float
 from app.src.config.database import Base
 import enum
 import uuid
@@ -22,6 +23,7 @@ class HealthFacility(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String, nullable=False)
     type = Column(Enum(HealthFacilityType), nullable=False)
+    rating = Column(Float, nullable=True)
 
     # Foreign key for quick administrative lookup, though spatial queries will be primary.
     subdistrict_id = Column(UUID(as_uuid=True), ForeignKey("subdistricts.id"), nullable=True)

@@ -10,6 +10,7 @@ from app.src.views.region_view import region_router
 from app.src.views.analysis_view import analysis_router
 from app.src.views.simulation_view import simulation_router
 from app.src.views.reports_view import reports_router
+from app.src.views.chatbot_view import chatbot_router
 from app.src.utils.exceptions import (
     AuthenticationException, 
     DatabaseException, 
@@ -41,6 +42,7 @@ app.include_router(region_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
 app.include_router(simulation_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(chatbot_router, prefix="/api/v1")
 
 # Initialize cache on startup
 @app.on_event("startup")
