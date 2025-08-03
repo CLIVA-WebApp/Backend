@@ -10,35 +10,40 @@ Platform ini dirancang untuk memberikan solusi komprehensif dalam analisis dan p
 - **Algoritma Prioritas Kecamatan** - Scoring system untuk menentukan prioritas pembangunan Puskesmas
 - **Simulator "What-If"** - Simulasi dampak pembangunan Puskesmas baru
 - **Manajemen Data Terpusat** - CRUD untuk data Puskesmas dan populasi
+- **Ceeva Chatbot** - Asisten AI untuk analisis dan perencanaan kesehatan
 
 ## 🏗️ Arsitektur Teknis
 
 ### Tech Stack
 - **Backend Framework**: FastAPI (Python)
-- **Database**: PostgreSQL via Supabase (Cloud Database)
+- **Database**: PostgreSQL via Supabase (Cloud Database) dengan PostGIS extension
 - **Architecture**: MVCS (Model-View-Controller-Service)
-- **Authentication**: JWT (JSON Web Tokens)
+- **Authentication**: JWT (JSON Web Tokens) + Google OAuth
 - **ORM**: SQLAlchemy
 - **Database Migrations**: Alembic
 - **API Documentation**: Auto-generated dengan FastAPI
+- **Containerization**: Docker & Docker Compose
+- **AI Assistant**: Groq API (Llama 3.1 8B)
 
 ### Struktur Direktori
 ```
 Backend/
-├── src/
+├── app/src/
 │   ├── config/          # Database & settings
-│   ├── models/          # SQLAlchemy models (User, Puskesmas, Population)
+│   ├── models/          # SQLAlchemy models
 │   ├── views/           # FastAPI routes/endpoints
-│   ├── controllers/     # Business logic
-│   ├── services/        # External services, utilities
+│   ├── controllers/     # Data access layer
+│   ├── services/        # Business logic
 │   ├── middleware/      # Authentication, validation
 │   ├── schemas/         # Pydantic models
 │   └── utils/           # Helper functions
 ├── alembic/             # Database migrations
 ├── tests/               # Unit tests
+├── raw_data/            # GDB files and data sources
+├── data_scripts/        # Data processing scripts
 ├── requirements.txt     # Python dependencies
-├── setup.py            # Setup script
-├── start.py            # Development server
+├── docker-compose.yaml  # Docker services
+├── Dockerfile          # Container configuration
 └── README.md           # This file
 ```
 
@@ -66,7 +71,14 @@ Simulasi dampak pembangunan Puskesmas baru:
 - Estimasi dampak pada populasi
 - Rekomendasi lokasi optimal
 
-### 4. Data Management
+### 4. Ceeva AI Assistant
+Asisten AI untuk perencanaan kesehatan:
+- Analisis pola akses kesehatan
+- Interpretasi hasil simulasi
+- Saran lokasi optimal fasilitas
+- Penjelasan metrik kesehatan
+
+### 5. Data Management
 Sistem manajemen data terpusat untuk:
 - Data Puskesmas (lokasi, kapasitas, coverage)
 - Data populasi per kecamatan
@@ -95,83 +107,100 @@ Sistem manajemen data terpusat untuk:
 - Koordinat pusat kecamatan
 - Tahun data
 
+### Simulation Results
+- Hasil simulasi "what-if"
+- Konteks untuk chatbot
+- Automated reasoning
+- Historical analysis
+
 ## 🔌 API Endpoints
 
 ### Authentication
 - `POST /auth/register` - Registrasi perencana kesehatan
 - `POST /auth/login` - Login ke sistem
 - `POST /auth/logout` - Logout dari sistem
+- `GET /auth/google` - Google OAuth login
+- `GET /auth/google/callback` - Google OAuth callback
 
-### Puskesmas Management
-- `GET /puskesmas/` - Daftar semua Puskesmas
-- `POST /puskesmas/` - Tambah Puskesmas baru
-- `GET /puskesmas/{id}` - Detail Puskesmas
-- `PUT /puskesmas/{id}` - Update data Puskesmas
-- `DELETE /puskesmas/{id}` - Hapus Puskesmas
+### Region Management
+- `GET /regions/provinces` - Daftar semua provinsi
+- `GET /regions/provinces/{id}/regencies` - Regencies dalam provinsi
+- `GET /regions/regencies/{id}/subdistricts` - Subdistricts dalam regency
+- `GET /regions/regencies/{id}/facilities` - Fasilitas kesehatan dalam regency
 
-### Population Management
-- `GET /populations/` - Daftar data populasi
-- `POST /populations/` - Tambah data populasi
-- `GET /populations/{id}` - Detail data populasi
-- `PUT /populations/{id}` - Update data populasi
-- `DELETE /populations/{id}` - Hapus data populasi
+### Analysis & Simulation
+- `POST /analysis/heatmap` - Generate heatmap data
+- `POST /analysis/priority-scores` - Calculate priority scores
+- `POST /simulation/run` - Run "what-if" simulation
+- `GET /simulation/results` - Get simulation results
+
+### Chatbot
+- `POST /chatbot/start_chat` - Start new chat session
+- `POST /chatbot/assist` - Get AI assistance
 
 ### Health Check
 - `GET /` - Root endpoint
 - `GET /health` - Status API
 
-## 📅 Roadmap Implementasi
+## 🐳 Docker Setup
 
-### ✅ Day 1: Foundation & Authentication (SELESAI)
-- Setup Supabase database
-- Create User model untuk perencana kesehatan
-- Implement authentication (register/login)
-- Create basic API endpoints
-- Setup CORS untuk frontend
+### Quick Start with Docker
 
-### ✅ Day 2: Data Models & CRUD (SELESAI)
-- Create Puskesmas model
-- Create Population model
-- Implement CRUD operations
-- Add data validation dengan Pydantic
+1. **Environment Setup**
+```bash
+cp env.example .env
+# Edit .env with your Supabase credentials
+```
 
-### 🔄 Day 3: Health Access Heatmaps (DALAM PROSES)
-- Implement geospatial calculations
-- Create distance calculation API
-- Add radius coverage logic
-- Create heatmap data endpoint
+2. **Production Deployment**
+```bash
+docker-compose up -d
+```
 
-### 📋 Day 4: Equity Prioritization Score (PLANNED)
-- Implement scoring algorithm
-- Create priority calculation API
-- Add multiple factor calculations
-- Create ranking system
+3. **Development Setup**
+```bash
+docker-compose -f docker-compose.dev.yaml up -d
+```
 
-### 🎯 Day 5: "What-If" Simulator & Polishing (PLANNED)
-- Implement simulation logic
-- Create virtual Puskesmas API
-- Add impact calculation
-- Create simulation results endpoint
+### Access Points
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+- **pgAdmin** (dev only): http://localhost:5050
 
-## 🎯 Manfaat Platform
+### Database Management
+```bash
+# Run migrations
+docker-compose exec backend alembic upgrade head
 
-### Untuk Perencana Kesehatan
-- **Data-Driven Decision Making**: Keputusan berbasis data yang akurat
-- **Visualisasi Komprehensif**: Peta interaktif untuk analisis
-- **Simulasi Dampak**: Prediksi hasil sebelum implementasi
-- **Prioritasi Efektif**: Algoritma untuk menentukan prioritas
+# Connect to database
+docker exec -it health-access-db psql -U postgres -d health_access
+```
 
-### Untuk Masyarakat
-- **Akses Kesehatan Merata**: Distribusi fasilitas yang optimal
-- **Transparansi Perencanaan**: Data terbuka untuk publik
-- **Efisiensi Sumber Daya**: Penggunaan anggaran yang efektif
-- **Peningkatan Kualitas Hidup**: Akses kesehatan yang lebih baik
+## 📁 Data Loading
 
-### Untuk Pemerintah Daerah
-- **Evidence-Based Policy**: Kebijakan berbasis bukti
-- **Resource Optimization**: Optimasi penggunaan sumber daya
-- **Monitoring & Evaluation**: Sistem monitoring yang terintegrasi
-- **Stakeholder Collaboration**: Kolaborasi antar pemangku kepentingan
+### GDB Data Loading
+
+The platform supports loading GDB (Geodatabase) files for administrative boundaries:
+
+```bash
+# Install required packages
+pip install geopandas fiona shapely
+
+# Run data loader
+python load_gdb_data.py
+```
+
+### What Gets Loaded
+- **Provinces** (Provinsi) - Top-level administrative units
+- **Regencies** (Kabupaten/Kota) - Second-level administrative units  
+- **Subdistricts** (Kecamatan) - Third-level administrative units
+- **Population Points** - Population distribution data
+- **Health Facilities** - Puskesmas and other health facilities
+
+### Data Sources
+- **Administrative Boundaries**: RBI10K_ADMINISTRASI_DESA_20230928.gdb
+- **Population Data**: CSV files from BPS
+- **Health Facilities**: Geocoded health center data
 
 ## 🔧 Quick Start untuk Development
 
@@ -192,6 +221,7 @@ pip install -r requirements.txt
 
 ### 3. Setup Supabase
 - Buat project di [Supabase](https://supabase.com)
+- Enable PostGIS extension
 - Dapatkan database credentials dari Settings > Database
 - Copy connection string
 
@@ -201,8 +231,12 @@ cp env.example .env
 # Edit .env dengan Supabase credentials Anda
 ```
 
-### 5. Run Database Migrations
+### 5. Load Data
 ```bash
+# Load administrative boundaries
+python load_gdb_data.py
+
+# Run database migrations
 alembic upgrade head
 ```
 
@@ -232,13 +266,11 @@ pytest --cov=src --cov-report=html
 ## 🛠️ Development Commands
 
 ```bash
-
 python run.py install    # Install dependencies
 python run.py setup      # Setup environment
 python run.py test       # Run tests
 python run.py run        # Start server
 python run.py migrate    # Run migrations
-
 ```
 
 ## 🤝 Kontribusi
@@ -260,3 +292,5 @@ Untuk pertanyaan atau kolaborasi, silakan hubungi tim pengembang CLIVA.
 ---
 
 **CLIVA - Empowering Health Planning Through Data-Driven Decisions**
+
+> 📖 **For detailed technical documentation, see [TECHNICAL_README.md](./TECHNICAL_README.md)**
