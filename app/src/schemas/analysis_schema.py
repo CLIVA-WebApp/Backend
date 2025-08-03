@@ -29,7 +29,7 @@ class HeatmapData(BaseModel):
 
 # Priority Score Analysis Schemas
 class SubDistrictScore(BaseModel):
-    sub_district_id: UUID = Field(..., description="ID of the sub-district")
+    subdistrict_id: UUID = Field(..., description="ID of the sub-district")
     sub_district_name: str = Field(..., description="Name of the sub-district")
     gap_factor: float = Field(..., description="Gap factor score")
     efficiency_factor: float = Field(..., description="Efficiency factor score")
@@ -51,7 +51,7 @@ class PriorityScoreData(BaseModel):
 
 # SubDistrict Details Schema
 class SubDistrictDetails(BaseModel):
-    sub_district_id: UUID = Field(..., description="ID of the sub-district")
+    subdistrict_id: UUID = Field(..., description="ID of the sub-district")
     sub_district_name: str = Field(..., description="Name of the sub-district")
     regency_id: UUID = Field(..., description="ID of the parent regency")
     regency_name: str = Field(..., description="Name of the parent regency")
@@ -108,7 +108,7 @@ class SimulationRequest(BaseModel):
 class OptimizedFacility(BaseModel):
     latitude: float = Field(..., description="Latitude coordinate of optimal location")
     longitude: float = Field(..., description="Longitude coordinate of optimal location")
-    sub_district_id: UUID = Field(..., description="ID of the sub-district")
+    subdistrict_id: UUID = Field(..., description="ID of the sub-district")
     sub_district_name: str = Field(..., description="Name of the sub-district")
     estimated_cost: float = Field(..., description="Estimated cost for this facility")
     population_covered: int = Field(..., description="Population that would be covered")

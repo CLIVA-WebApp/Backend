@@ -138,7 +138,7 @@ class ReportService:
             writer.writerow([
                 facility.get("latitude", 0),
                 facility.get("longitude", 0),
-                facility.get("sub_district_id", ""),
+                facility.get("subdistrict_id", ""),
                 facility.get("sub_district_name", ""),
                 facility.get("estimated_cost", 0),
                 facility.get("population_covered", 0),
@@ -172,7 +172,7 @@ class ReportService:
         for subdistrict in data.get("sub_districts", []):
             writer.writerow([
                 subdistrict.get("rank", 0),
-                subdistrict.get("sub_district_id", ""),
+                subdistrict.get("subdistrict_id", ""),
                 subdistrict.get("sub_district_name", ""),
                 subdistrict.get("gap_factor", 0),
                 subdistrict.get("efficiency_factor", 0),
@@ -230,7 +230,7 @@ class ReportService:
         
         # Write sub-district details
         writer.writerow([
-            data.get("sub_district_id", ""),
+            data.get("subdistrict_id", ""),
             data.get("sub_district_name", ""),
             data.get("regency_id", ""),
             data.get("regency_name", ""),

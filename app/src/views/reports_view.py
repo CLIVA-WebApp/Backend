@@ -106,7 +106,7 @@ async def _validate_report_data(request: ReportExportRequest) -> None:
     
     elif request.report_type == "subdistrict_details":
         required_fields = [
-            "sub_district_id", "sub_district_name", "regency_id", "regency_name",
+            "subdistrict_id", "sub_district_name", "regency_id", "regency_name",
             "population", "area_km2", "population_density", "poverty_rate",
             "existing_facilities_count", "existing_facilities", "gap_factor",
             "efficiency_factor", "vulnerability_factor", "composite_score", "rank"

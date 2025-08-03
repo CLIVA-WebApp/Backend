@@ -3,7 +3,9 @@ from typing import Optional, Union
 from app.src.schemas.region_schema import (
     ProvinceListResponse,
     RegencyListResponse,
+    AllRegencyListResponse,
     SubDistrictListResponse,
+    AllSubDistrictListResponse,
     FacilityListResponse
 )
 from app.src.schemas.user_schema import UserSchema
@@ -44,6 +46,60 @@ async def get_provinces(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve provinces: {str(e)}"
+        )
+
+@region_router.get(
+    "/all-regencies",
+    response_model=AllRegencyListResponse,
+    summary="Get All Regencies",
+    description="Retrieve a list of all regencies (Kabupaten/Kota) in Indonesia. This endpoint provides comprehensive data for the frontend dropdown selection."
+)
+async def get_all_regencies(
+    current_user: UserSchema = Depends(get_current_user_required)
+) -> AllRegencyListResponse:
+    """
+    Get all regencies in Indonesia.
+    
+    This endpoint returns a list of all regencies (Kabupaten/Kota) that can be used to populate
+    dropdown menus in the frontend, allowing users to select any regency for analysis.
+    """
+    try:
+        regencies = await region_service.get_all_regencies()
+        return AllRegencyListResponse(
+            regencies=regencies,
+            total=len(regencies)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve regencies: {str(e)}"
+        )
+
+@region_router.get(
+    "/all-subdistricts",
+    response_model=AllSubDistrictListResponse,
+    summary="Get All Sub-districts",
+    description="Retrieve a list of all sub-districts (Kecamatan) in Indonesia. This endpoint provides comprehensive data for the frontend dropdown selection."
+)
+async def get_all_subdistricts(
+    current_user: UserSchema = Depends(get_current_user_required)
+) -> AllSubDistrictListResponse:
+    """
+    Get all sub-districts in Indonesia.
+    
+    This endpoint returns a list of all sub-districts (Kecamatan) that can be used to populate
+    dropdown menus in the frontend, allowing users to select any sub-district for analysis.
+    """
+    try:
+        subdistricts = await region_service.get_all_subdistricts()
+        return AllSubDistrictListResponse(
+            sub_districts=subdistricts,
+            total=len(subdistricts)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve sub-districts: {str(e)}"
         )
 
 @region_router.get(

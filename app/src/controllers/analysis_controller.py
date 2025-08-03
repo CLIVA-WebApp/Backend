@@ -140,7 +140,7 @@ class AnalysisController:
         """Get all health facilities in a subdistrict"""
         try:
             def execute_query(db):
-                facilities = db.query(HealthFacility).filter(HealthFacility.sub_district_id == subdistrict_id).all()
+                facilities = db.query(HealthFacility).filter(HealthFacility.subdistrict_id == subdistrict_id).all()
                 result = []
                 for facility in facilities:
                     # Extract coordinates from geometry
@@ -161,7 +161,7 @@ class AnalysisController:
                         'longitude': coords_result.longitude if coords_result else 0.0,
                         'regency_id': facility.sub_district.regency_id if hasattr(facility, 'sub_district') and facility.sub_district else None,
                         'regency_name': facility.sub_district.regency.name if hasattr(facility, 'sub_district') and facility.sub_district and hasattr(facility.sub_district, 'regency') and facility.sub_district.regency else None,
-                        'sub_district_id': facility.sub_district_id,
+                        'subdistrict_id': facility.subdistrict_id,
                         'sub_district_name': facility.sub_district.name if hasattr(facility, 'sub_district') and facility.sub_district else None
                     })
                 return result

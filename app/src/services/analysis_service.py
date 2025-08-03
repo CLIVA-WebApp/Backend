@@ -106,7 +106,7 @@ class AnalysisService:
                         longitude=106.8540,
                         regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                        subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
                     ),
                     FacilitySchema(
@@ -117,7 +117,7 @@ class AnalysisService:
                         longitude=106.8540,
                         regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                        subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
                     )
                 ]
@@ -515,7 +515,7 @@ class AnalysisService:
                     composite_score = 0.5
                 
                 final_scores.append(SubDistrictScore(
-                    sub_district_id=score['id'],
+                    subdistrict_id=score['id'],
                     sub_district_name=score['name'],
                     gap_factor=score['gap_factor_normalized'],
                     efficiency_factor=score['efficiency_factor_normalized'],
@@ -540,7 +540,7 @@ class AnalysisService:
         """Generate mock priority scores for testing purposes."""
         mock_scores = [
             SubDistrictScore(
-                sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                 sub_district_name="Kecamatan Cibinong",
                 gap_factor=0.75,
                 efficiency_factor=0.65,
@@ -549,7 +549,7 @@ class AnalysisService:
                 rank=1
             ),
             SubDistrictScore(
-                sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
+                subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
                 sub_district_name="Kecamatan Gunung Putri",
                 gap_factor=0.60,
                 efficiency_factor=0.70,
@@ -573,7 +573,7 @@ class AnalysisService:
                     total_sub_districts=2,
                     sub_districts=[
                         SubDistrictScore(
-                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                            subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                             sub_district_name="Kecamatan Cibinong",
                             gap_factor=0.75,
                             efficiency_factor=0.65,
@@ -582,7 +582,7 @@ class AnalysisService:
                             rank=1
                         ),
                         SubDistrictScore(
-                            sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
+                            subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440005"),
                             sub_district_name="Kecamatan Gunung Putri",
                             gap_factor=0.60,
                             efficiency_factor=0.70,
@@ -631,7 +631,7 @@ class AnalysisService:
             # Check if this is a mock request
             if str(subdistrict_id) == "mock":
                 mock_details = SubDistrictDetails(
-                    sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                    subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                     sub_district_name="Kecamatan Cibinong",
                     regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                     regency_name="Kabupaten Bogor",
@@ -691,7 +691,7 @@ class AnalysisService:
             
             # Find the score for this specific sub-district
             sub_district_score = next(
-                (score for score in sub_district_scores if score.sub_district_id == subdistrict_id),
+                (score for score in sub_district_scores if score.subdistrict_id == subdistrict_id),
                 None
             )
             
@@ -730,7 +730,7 @@ class AnalysisService:
                 })
             
             details = SubDistrictDetails(
-                sub_district_id=subdistrict_id,
+                subdistrict_id=subdistrict_id,
                 sub_district_name=subdistrict_data['name'],
                 regency_id=subdistrict_data['regency_id'],
                 regency_name=subdistrict_data['regency_name'],

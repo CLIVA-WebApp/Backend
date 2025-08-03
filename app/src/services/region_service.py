@@ -99,6 +99,24 @@ class RegionService:
             logger.error(f"Error retrieving regencies for province {province_id}: {str(e)}")
             raise
     
+    async def get_all_regencies(self) -> List[RegencySchema]:
+        """
+        Get all regencies in Indonesia.
+        """
+        try:
+            regencies_data = await region_controller.get_all_regencies()
+            
+            regency_schemas = []
+            for regency_data in regencies_data:
+                regency_schemas.append(RegencySchema(**regency_data))
+            
+            logger.info(f"Retrieved {len(regency_schemas)} regencies")
+            return regency_schemas
+            
+        except Exception as e:
+            logger.error(f"Error retrieving all regencies: {str(e)}")
+            raise
+    
     async def get_subdistricts_by_regency(self, regency_id: UUID) -> List[SubDistrictSchema]:
         """
         Get all sub-districts within a specific regency.
@@ -143,6 +161,24 @@ class RegionService:
             logger.error(f"Error retrieving subdistricts for regency {regency_id}: {str(e)}")
             raise
     
+    async def get_all_subdistricts(self) -> List[SubDistrictSchema]:
+        """
+        Get all sub-districts in Indonesia.
+        """
+        try:
+            subdistricts_data = await region_controller.get_all_subdistricts()
+            
+            subdistrict_schemas = []
+            for subdistrict_data in subdistricts_data:
+                subdistrict_schemas.append(SubDistrictSchema(**subdistrict_data))
+            
+            logger.info(f"Retrieved {len(subdistrict_schemas)} subdistricts")
+            return subdistrict_schemas
+            
+        except Exception as e:
+            logger.error(f"Error retrieving all subdistricts: {str(e)}")
+            raise
+    
     async def get_facilities_by_regency(self, regency_id: UUID) -> List[FacilitySchema]:
         """
         Get all health facilities within a specific regency.
@@ -159,7 +195,7 @@ class RegionService:
                         longitude=106.8540,
                         regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                        subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
                     ),
                     FacilitySchema(
@@ -170,7 +206,7 @@ class RegionService:
                         longitude=106.8540,
                         regency_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                         regency_name="Kabupaten Bogor",
-                        sub_district_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                        subdistrict_id=UUID("550e8400-e29b-41d4-a716-446655440004"),
                         sub_district_name="Kecamatan Cibinong"
                     )
                 ]

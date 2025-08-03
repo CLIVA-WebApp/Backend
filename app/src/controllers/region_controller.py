@@ -61,6 +61,28 @@ class RegionController:
             raise DatabaseException(f"Error fetching province: {str(e)}")
     
     # Database operations for regencies
+    async def get_all_regencies(self) -> List[Dict[str, Any]]:
+        """Get all regencies from database"""
+        try:
+            def execute_query(db):
+                regencies = db.query(Regency).all()
+                return [
+                    {
+                        'id': regency.id,
+                        'name': regency.name,
+                        'pum_code': regency.pum_code,
+                        'province_id': regency.province_id,
+                        'province_name': regency.province.name if hasattr(regency, 'province') and regency.province else None,
+                        'area_km2': regency.area_km2
+                    }
+                    for regency in regencies
+                ]
+            
+            return execute_query(self._get_db_session())
+        except Exception as e:
+            logger.error(f"Error fetching all regencies: {str(e)}")
+            raise DatabaseException(f"Error fetching all regencies: {str(e)}")
+    
     async def get_regencies_by_province(self, province_id: UUID) -> List[Dict[str, Any]]:
         """Get all regencies in a province"""
         try:
@@ -84,6 +106,30 @@ class RegionController:
             raise DatabaseException(f"Error fetching regencies: {str(e)}")
     
     # Database operations for subdistricts
+    async def get_all_subdistricts(self) -> List[Dict[str, Any]]:
+        """Get all subdistricts from database"""
+        try:
+            def execute_query(db):
+                subdistricts = db.query(Subdistrict).all()
+                return [
+                    {
+                        'id': subdistrict.id,
+                        'name': subdistrict.name,
+                        'pum_code': subdistrict.pum_code,
+                        'regency_id': subdistrict.regency_id,
+                        'regency_name': subdistrict.regency.name if hasattr(subdistrict, 'regency') and subdistrict.regency else None,
+                        'population_count': subdistrict.population_count,
+                        'poverty_level': subdistrict.poverty_level,
+                        'area_km2': subdistrict.area_km2
+                    }
+                    for subdistrict in subdistricts
+                ]
+            
+            return execute_query(self._get_db_session())
+        except Exception as e:
+            logger.error(f"Error fetching all subdistricts: {str(e)}")
+            raise DatabaseException(f"Error fetching all subdistricts: {str(e)}")
+    
     async def get_subdistricts_by_regency(self, regency_id: UUID) -> List[Dict[str, Any]]:
         """Get all subdistricts in a regency"""
         try:
@@ -135,7 +181,7 @@ class RegionController:
                         'longitude': coords_result.longitude if coords_result else 0.0,
                         'regency_id': facility.sub_district.regency_id if hasattr(facility, 'sub_district') and facility.sub_district else None,
                         'regency_name': facility.sub_district.regency.name if hasattr(facility, 'sub_district') and facility.sub_district and hasattr(facility.sub_district, 'regency') and facility.sub_district.regency else None,
-                        'sub_district_id': facility.sub_district_id,
+                        'subdistrict_id': facility.subdistrict_id,
                         'sub_district_name': facility.sub_district.name if hasattr(facility, 'sub_district') and facility.sub_district else None
                     })
                 

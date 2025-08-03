@@ -166,7 +166,7 @@ async def run_legacy_simulation(
                     {
                         "latitude": facility.latitude,
                         "longitude": facility.longitude,
-                        "sub_district_id": str(facility.sub_district_id),
+                        "subdistrict_id": str(facility.subdistrict_id),
                         "sub_district_name": facility.sub_district_name,
                         "estimated_cost": facility.estimated_cost,
                         "population_covered": facility.population_covered,

@@ -45,7 +45,7 @@ class FacilitySchema(BaseModel):
     longitude: float = Field(..., description="Longitude coordinate")
     regency_id: UUID = Field(..., description="ID of the parent regency")
     regency_name: Optional[str] = Field(None, description="Name of the parent regency")
-    sub_district_id: Optional[UUID] = Field(None, description="ID of the sub-district where facility is located")
+    subdistrict_id: Optional[UUID] = Field(None, description="ID of the sub-district where facility is located")
     sub_district_name: Optional[str] = Field(None, description="Name of the sub-district where facility is located")
     
     class Config:
@@ -66,10 +66,24 @@ class RegencyListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class AllRegencyListResponse(BaseModel):
+    regencies: List[RegencySchema]
+    total: int = Field(..., description="Total number of regencies")
+    
+    class Config:
+        from_attributes = True
+
 class SubDistrictListResponse(BaseModel):
     sub_districts: List[SubDistrictSchema]
     total: int = Field(..., description="Total number of sub-districts")
     regency_id: UUID = Field(..., description="ID of the regency")
+    
+    class Config:
+        from_attributes = True
+
+class AllSubDistrictListResponse(BaseModel):
+    sub_districts: List[SubDistrictSchema]
+    total: int = Field(..., description="Total number of sub-districts")
     
     class Config:
         from_attributes = True

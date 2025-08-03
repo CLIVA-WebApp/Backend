@@ -425,7 +425,7 @@ class SimulationService:
                 optimized_facilities.append(OptimizedFacility(
                     latitude=rec.coordinates.lat,
                     longitude=rec.coordinates.lon,
-                    sub_district_id=rec.subdistrict_id,
+                    subdistrict_id=rec.subdistrict_id,
                     sub_district_name=rec.location_name,
                     estimated_cost=rec.estimated_cost,
                     population_covered=0,  # Would need to calculate this

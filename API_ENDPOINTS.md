@@ -283,7 +283,7 @@
     {
       "latitude": -6.2088,
       "longitude": 106.8456,
-      "sub_district_id": "550e8400-e29b-41d4-a716-446655440003",
+      "subdistrict_id": "550e8400-e29b-41d4-a716-446655440003",
       "sub_district_name": "Kecamatan Kebayoran Baru",
       "estimated_cost": 2000000000,
       "population_covered": 50000,

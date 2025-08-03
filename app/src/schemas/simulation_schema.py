@@ -62,7 +62,7 @@ class SimulationResponse(BaseModel):
 class OptimizedFacility(BaseModel):
     latitude: float = Field(..., description="Latitude of the facility location")
     longitude: float = Field(..., description="Longitude of the facility location")
-    sub_district_id: UUID = Field(..., description="ID of the sub-district")
+    subdistrict_id: UUID = Field(..., description="ID of the sub-district")
     sub_district_name: str = Field(..., description="Name of the sub-district")
     estimated_cost: float = Field(..., description="Estimated cost of the facility")
     population_covered: int = Field(..., description="Population covered by this facility")
