@@ -1,17 +1,10 @@
 import numpy as np
 from sklearn.cluster import KMeans
-from typing import List, Dict, Any, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy import text, func
+from typing import List, Dict, Any, Optional
 from uuid import UUID
 import traceback
 
-from app.src.config.database import get_db
-from app.src.models.regency import Regency
-from app.src.models.subdistrict import Subdistrict
-from app.src.models.province import Province
-from app.src.models.population_point import PopulationPoint
-from app.src.models.health_facility import HealthFacility
+from app.src.controllers.simulation_controller import simulation_controller
 from app.src.schemas.simulation_schema import (
     SimulationResponse, SimulationSummary, Recommendation, 
     Coordinates, FacilityType, LegacySimulationResponse, OptimizedFacility,
@@ -39,10 +32,9 @@ class SimulationService:
         """Set custom coverage radius"""
         self.coverage_radius_km = radius_km
     
-    def get_subdistrict_by_id(self, subdistrict_id: UUID) -> Subdistrict:
+    async def get_subdistrict_by_id(self, subdistrict_id: UUID) -> Optional[Dict[str, Any]]:
         """Get subdistrict by ID"""
-        db = next(get_db())
-        return db.query(Subdistrict).filter(Subdistrict.id == subdistrict_id).first()
+        return await simulation_controller.get_subdistrict_by_id(subdistrict_id)
     
     def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """Calculate distance between two points using Haversine formula"""
@@ -63,105 +55,17 @@ class SimulationService:
         
         return R * c
     
-    def _get_subdistrict_ids_by_level(self, geographic_level: GeographicLevel, area_ids: List[UUID]) -> List[UUID]:
+    async def _get_subdistrict_ids_by_level(self, geographic_level: GeographicLevel, area_ids: List[UUID]) -> List[UUID]:
         """Get subdistrict IDs based on the geographic level"""
-        db = next(get_db())
-        
-        try:
-            if geographic_level == GeographicLevel.SUBDISTRICT:
-                return area_ids
-            elif geographic_level == GeographicLevel.REGENCY:
-                # Get all subdistricts in the specified regencies
-                query = text("""
-                    SELECT id FROM subdistricts 
-                    WHERE regency_id = ANY(CAST(:regency_ids AS uuid[]))
-                """)
-                result = db.execute(query, {"regency_ids": [str(id) for id in area_ids]}).fetchall()
-                return [row.id for row in result]
-            elif geographic_level == GeographicLevel.PROVINCE:
-                # Get all subdistricts in the specified provinces
-                query = text("""
-                    SELECT s.id FROM subdistricts s
-                    JOIN regencies r ON s.regency_id = r.id
-                    WHERE r.province_id = ANY(CAST(:province_ids AS uuid[]))
-                """)
-                result = db.execute(query, {"province_ids": [str(id) for id in area_ids]}).fetchall()
-                return [row.id for row in result]
-            else:
-                raise ValueError(f"Unsupported geographic level: {geographic_level}")
-        except Exception as e:
-            print(f"Error in _get_subdistrict_ids_by_level: {e}")
-            print(f"Stack trace: {traceback.format_exc()}")
-            raise
+        return await simulation_controller.get_subdistrict_ids_by_level(geographic_level, area_ids)
     
-    def _get_population_data(self, subdistrict_ids: List[UUID]) -> List[Dict[str, Any]]:
+    async def _get_population_data(self, subdistrict_ids: List[UUID]) -> List[Dict[str, Any]]:
         """Get population data for specified subdistricts"""
-        db = next(get_db())
-        
-        try:
-            # Get all population points in the specified subdistricts using PostGIS functions
-            query = text("""
-                SELECT 
-                    pp.id,
-                    pp.population_count,
-                    ST_X(pp.geom) as longitude,
-                    ST_Y(pp.geom) as latitude,
-                    pp.subdistrict_id,
-                    s.name as subdistrict_name
-                FROM population_points pp
-                JOIN subdistricts s ON pp.subdistrict_id = s.id
-                WHERE pp.subdistrict_id = ANY(CAST(:subdistrict_ids AS uuid[]))
-            """)
-            
-            population_points = db.execute(query, {"subdistrict_ids": [str(id) for id in subdistrict_ids]}).fetchall()
-            
-            return [
-                {
-                    'id': point.id,
-                    'latitude': point.latitude,
-                    'longitude': point.longitude,
-                    'population': point.population_count,
-                    'subdistrict_id': point.subdistrict_id,
-                    'subdistrict_name': point.subdistrict_name
-                }
-                for point in population_points
-            ]
-        except Exception as e:
-            print(f"Error in _get_population_data: {e}")
-            print(f"Stack trace: {traceback.format_exc()}")
-            raise
+        return await simulation_controller.get_population_data(subdistrict_ids)
     
-    def _get_existing_facilities(self, subdistrict_ids: List[UUID]) -> List[Dict[str, Any]]:
+    async def _get_existing_facilities(self, subdistrict_ids: List[UUID]) -> List[Dict[str, Any]]:
         """Get existing health facilities in the specified subdistricts"""
-        db = next(get_db())
-        
-        try:
-            # Get existing health facilities using PostGIS functions
-            facilities_query = text("""
-                SELECT 
-                    hf.id,
-                    ST_X(hf.geom) as longitude,
-                    ST_Y(hf.geom) as latitude,
-                    hf.type
-                FROM health_facilities hf
-                WHERE hf.subdistrict_id = ANY(CAST(:subdistrict_ids AS uuid[]))
-            """)
-            
-            existing_facilities = db.execute(facilities_query, {"subdistrict_ids": [str(id) for id in subdistrict_ids]}).fetchall()
-            
-            return [
-                {
-                    'id': facility.id,
-                    'latitude': facility.latitude,
-                    'longitude': facility.longitude,
-                    'type': facility.type
-                }
-                for facility in existing_facilities
-            ]
-        except Exception as e:
-            print(f"Error in _get_existing_facilities: {e}")
-            print(f"Stack trace: {traceback.format_exc()}")
-            raise
+        return await simulation_controller.get_existing_facilities(subdistrict_ids)
     
     def _calculate_initial_coverage(self, population_points: List[Dict[str, Any]], 
                                   existing_facilities: List[Dict[str, Any]]) -> float:

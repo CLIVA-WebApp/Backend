@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     frontend_url: str = Field(..., alias="FRONTEND_URL")
     backend_url: str = Field(..., alias="BACKEND_URL")
     allowed_origins: str = Field(..., alias="ALLOWED_ORIGINS")
+    
+    # Cache configuration
+    redis_enabled: bool = Field(True, alias="REDIS_ENABLED")
 
     @field_validator('allowed_origins')
     @classmethod

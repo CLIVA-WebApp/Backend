@@ -1,27 +1,23 @@
 import logging
 from supabase import create_client, Client
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import secrets
 from app.src.config.settings import settings
 from app.src.models.user import User, UserProvider
 from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin
-from app.src.services.user_service import UserService
+from app.src.controllers.auth_controller import auth_controller
+from app.src.services.geocoding_service import GeocodingService
 from app.src.utils.exceptions import AuthenticationException
 from app.src.utils.password import hash_password, verify_password, is_password_strong
 
 class AuthService:
     def __init__(self):
-        self.user_service = UserService()
+        self.geocoding_service = GeocodingService()
         # Use anon key for OAuth operations
         self.supabase: Client = create_client(
             settings.supabase_url,
             settings.supabase_key
         )
-        self.jwt_secret = settings.jwt_secret_key
-        self.jwt_algorithm = settings.jwt_algorithm
-        self.token_expire_minutes = settings.access_token_expire_minutes
     
     def generate_google_auth_url(self) -> str:
         """Generate Google OAuth authorization URL - backend handles the entire flow"""
@@ -39,7 +35,7 @@ class AuthService:
         except Exception as e:
             raise AuthenticationException(f"Failed to generate Google OAuth URL: {str(e)}")
     
-    async def handle_oauth_callback(self, code: str, state: str = None) -> tuple[UserSchema, str]:
+    async def handle_oauth_callback(self, code: str, state: str = None) -> Tuple[UserSchema, str]:
         """Handle OAuth callback and exchange code for session"""
         try:
             # Exchange code for session
@@ -80,27 +76,27 @@ class AuthService:
             }
             
             # Create or update user in our database
-            user = await self.user_service.create_or_update_user(user_data)
+            user = await self.create_or_update_user(user_data)
             
             # Generate our own JWT token
-            jwt_token = self.create_access_token({"sub": user.email, "user_id": str(user.id)})
+            jwt_token = auth_controller.create_access_token({"sub": user.email, "user_id": str(user.id)})
             
             return user, jwt_token
             
         except Exception as e:
             raise AuthenticationException(f"OAuth callback failed: {str(e)}")
     
-    async def register_user(self, user_data: UserRegister) -> tuple[UserSchema, str]:
+    async def register_user(self, user_data: UserRegister) -> Tuple[UserSchema, str]:
         """Register a new user with email/password"""
         try:
             # Check if user already exists
-            existing_user = await self.user_service.get_user_by_email(user_data.email)
-            if existing_user:
+            existing_user_data = await auth_controller.get_user_by_email(user_data.email)
+            if existing_user_data:
                 raise AuthenticationException("User with this email already exists")
             
             # Check if username is taken
-            existing_username = await self.user_service.get_user_by_username(user_data.username)
-            if existing_username:
+            existing_username_data = await auth_controller.get_user_by_username(user_data.username)
+            if existing_username_data:
                 raise AuthenticationException("Username already taken")
             
             # Validate password strength
@@ -123,10 +119,11 @@ class AuthService:
             }
             
             # Create user in database
-            user = await self.user_service.create_user(user_create_data)
+            created_user_data = await auth_controller.create_user(user_create_data)
+            user = UserSchema(**created_user_data)
             
             # Generate JWT token
-            jwt_token = self.create_access_token({"sub": user.email, "user_id": str(user.id)})
+            jwt_token = auth_controller.create_access_token({"sub": user.email, "user_id": str(user.id)})
             
             return user, jwt_token
             
@@ -135,13 +132,15 @@ class AuthService:
         except Exception as e:
             raise AuthenticationException(f"Registration failed: {str(e)}")
     
-    async def login_user(self, login_data: UserLogin) -> tuple[UserSchema, str]:
+    async def login_user(self, login_data: UserLogin) -> Tuple[UserSchema, str]:
         """Login user with email/password"""
         try:
             # Get user by email with password for verification
-            user = await self.user_service.get_user_by_email_with_password(login_data.email)
-            if not user:
+            user_data = await auth_controller.get_user_by_email_with_password(login_data.email)
+            if not user_data:
                 raise AuthenticationException("Invalid email or password")
+            
+            user = UserSchema(**user_data)
             
             # Check if user has password (not OAuth only)
             if not user.hashed_password:
@@ -156,7 +155,7 @@ class AuthService:
                 raise AuthenticationException("Account is deactivated")
             
             # Generate JWT token
-            jwt_token = self.create_access_token({"sub": user.email, "user_id": str(user.id)})
+            jwt_token = auth_controller.create_access_token({"sub": user.email, "user_id": str(user.id)})
             
             return user, jwt_token
             
@@ -169,9 +168,11 @@ class AuthService:
         """Change user password"""
         try:
             # Get user with password for verification
-            user = await self.user_service.get_user_by_id_with_password(user_id)
-            if not user:
+            user_data = await auth_controller.get_user_by_id_with_password(user_id)
+            if not user_data:
                 raise AuthenticationException("User not found")
+            
+            user = UserSchema(**user_data)
             
             # Verify current password
             if not verify_password(current_password, user.hashed_password):
@@ -186,7 +187,7 @@ class AuthService:
             hashed_password = hash_password(new_password)
             
             # Update password
-            await self.user_service.update_user_password(user_id, hashed_password)
+            await auth_controller.update_user_password(user_id, hashed_password)
             
             return True
             
@@ -195,26 +196,9 @@ class AuthService:
         except Exception as e:
             raise AuthenticationException(f"Password change failed: {str(e)}")
     
-    def create_access_token(self, data: Dict[str, Any]) -> str:
-        """Create JWT access token"""
-        to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(minutes=self.token_expire_minutes)
-        to_encode.update({"exp": expire})
-        
-        encoded_jwt = jwt.encode(to_encode, self.jwt_secret, algorithm=self.jwt_algorithm)
-        return encoded_jwt
-    
-    def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Verify and decode JWT token"""
-        try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
-            return payload
-        except JWTError:
-            return None
-    
     async def get_current_user(self, token: str) -> Optional[UserSchema]:
         """Get current user from JWT token"""
-        payload = self.verify_token(token)
+        payload = auth_controller.verify_token(token)
         if not payload:
             return None
             
@@ -222,18 +206,59 @@ class AuthService:
         if not email:
             return None
             
-        return await self.user_service.get_user_by_email(email)
+        user_data = await auth_controller.get_user_by_email(email)
+        if user_data:
+            return UserSchema(**user_data)
+        return None
     
     async def update_user_location(self, user_id: str, location_data: dict) -> UserSchema:
-        """Update user location"""
+        """Update user location with automatic geocoding"""
         try:
-            return await self.user_service.update_user_location(user_id, location_data)
+            # If address is provided, geocode it to get coordinates
+            if "location_address" in location_data and location_data["location_address"]:
+                address = location_data["location_address"]
+                
+                # Geocode the address
+                geocoding_result = await self.geocoding_service.geocode_address(address)
+                
+                if geocoding_result:
+                    # Update with both address and geometry
+                    location_data["location_geom"] = geocoding_result["wkt_point"]
+                # If geocoding fails, still save the address but location_geom will remain null
+            
+            # Update user location in database
+            updated_user_data = await auth_controller.update_user_location(user_id, location_data)
+            return UserSchema(**updated_user_data)
+            
         except Exception as e:
             raise AuthenticationException(f"Failed to update user location: {str(e)}")
     
     async def update_user_name(self, user_id: str, name_data: dict) -> UserSchema:
         """Update user name (first_name and last_name)"""
         try:
-            return await self.user_service.update_user_name(user_id, name_data)
+            updated_user_data = await auth_controller.update_user_name(user_id, name_data)
+            return UserSchema(**updated_user_data)
         except Exception as e:
             raise AuthenticationException(f"Failed to update user name: {str(e)}")
+    
+    async def create_or_update_user(self, user_data: Dict[str, Any]) -> UserSchema:
+        """Create user if doesn't exist, otherwise update existing user"""
+        existing_user_data = await auth_controller.get_user_by_email(user_data["email"])
+        
+        if existing_user_data:
+            # Update existing user with new data
+            update_data = {
+                "username": user_data.get("username", existing_user_data["username"]),
+                "email": user_data.get("email", existing_user_data["email"]),
+                "first_name": user_data.get("first_name", existing_user_data["first_name"]),
+                "last_name": user_data.get("last_name", existing_user_data["last_name"]),
+                "provider": user_data.get("provider", existing_user_data["provider"]),
+                "provider_id": user_data.get("provider_id", existing_user_data["provider_id"]),
+                "is_active": user_data.get("is_active", existing_user_data["is_active"])
+            }
+            updated_user_data = await auth_controller.update_user(str(existing_user_data["id"]), update_data)
+            return UserSchema(**updated_user_data)
+        else:
+            # Create new user
+            created_user_data = await auth_controller.create_user(user_data)
+            return UserSchema(**created_user_data)

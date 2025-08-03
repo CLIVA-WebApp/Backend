@@ -1,309 +1,184 @@
-from fastapi import HTTPException, status, Depends, Response
-from typing import Optional
+from fastapi import HTTPException, status, Response
+from typing import Optional, Dict, Any
 from fastapi.responses import RedirectResponse
 from app.src.config.settings import settings
-from app.src.services.auth_service import AuthService
 from app.src.schemas.user_schema import UserSchema, UserRegister, UserLogin, PasswordChange, UserLocationUpdate, UserNameUpdate
-from app.src.middleware.auth_middleware import get_current_user_required
-from app.src.utils.exceptions import AuthenticationException
+from app.src.utils.exceptions import AuthenticationException, DatabaseException
 from app.src.schemas.auth_schema import (
     GoogleAuthResponse,
     UserResponse
 )
+from supabase import create_client, Client
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
 
 class AuthController:
     def __init__(self):
-        self.auth_service = AuthService()
-    
-    async def get_google_auth_url(self) -> dict:
-        """Generate Google OAuth authorization URL"""
-        try:
-            auth_url = self.auth_service.generate_google_auth_url()
-            return {"auth_url": auth_url}
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to generate auth URL: {str(e)}"
-            )
-    
-    async def handle_google_callback(self, code: str, state: str = None) -> dict:
-        """Handle Google OAuth callback and set session cookie"""
-        try:
-            user, jwt_token = await self.auth_service.handle_oauth_callback(code, state)
-            
-            response = RedirectResponse(url=f"{settings.frontend_url}/auth/success", status_code=302)
-
-            # Set HTTP-only cookie with the JWT token
-            response.set_cookie(
-                key="access_token",
-                value=jwt_token,
-                httponly=True,
-                secure=False,  # Set to True in production with HTTPS
-                samesite="lax",
-                max_age=self.auth_service.token_expire_minutes * 60
-            )
-            
-            return response
-        
-        except AuthenticationException as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=str(e)
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Authentication failed: {str(e)}"
-            )
-    
-    async def verify_session(self, access_token: str) -> dict:
-        """Verify session and return user data"""
-        try:
-            user = await self.auth_service.get_current_user(access_token)
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid session"
-                )
-            
-            return {
-                "user": {
-                    "id": str(user.id),
-                    "email": user.email,
-                    "username": user.username,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "location_address": user.location_address,
-                    "is_active": user.is_active
-                }
-            }
-        
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session verification failed"
-            )
-    
-    async def logout(self, response: Response) -> dict:
-        """Logout user by clearing session cookie"""
-        response.delete_cookie("access_token")
-        return {"message": "Successfully logged out"}
-    
-    async def register_user(self, user_data: UserRegister, response: Response) -> dict:
-        """Register a new user with email/password"""
-        try:
-            user, jwt_token = await self.auth_service.register_user(user_data)
-            
-            # Set HTTP-only cookie with the JWT token
-            response.set_cookie(
-                key="access_token",
-                value=jwt_token,
-                httponly=True,
-                secure=False,  # Set to True in production with HTTPS
-                samesite="lax",
-                max_age=self.auth_service.token_expire_minutes * 60
-            )
-            
-            return {
-                "message": "Registration successful",
-                "user": {
-                    "id": str(user.id),
-                    "email": user.email,
-                    "username": user.username,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "location_address": user.location_address,
-                    "is_active": user.is_active
-                }
-            }
-        
-        except AuthenticationException as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Registration failed: {str(e)}"
-            )
-    
-    async def login_user(self, login_data: UserLogin, response: Response) -> dict:
-        """Login user with email/password"""
-        try:
-            user, jwt_token = await self.auth_service.login_user(login_data)
-            
-            # Set HTTP-only cookie with the JWT token
-            response.set_cookie(
-                key="access_token",
-                value=jwt_token,
-                httponly=True,
-                secure=False,  # Set to True in production with HTTPS
-                samesite="lax",
-                max_age=self.auth_service.token_expire_minutes * 60
-            )
-            
-            return {
-                "message": "Login successful",
-                "user": {
-                    "id": str(user.id),
-                    "email": user.email,
-                    "username": user.username,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "location_address": user.location_address,
-                    "is_active": user.is_active
-                }
-            }
-        
-        except AuthenticationException as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=str(e)
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Login failed: {str(e)}"
-            )
-    
-    async def change_password(
-        self, 
-        password_data: PasswordChange,
-        current_user: UserSchema = Depends(get_current_user_required)
-    ) -> dict:
-        """Change user password"""
-        try:
-            success = await self.auth_service.change_password(
-                str(current_user.id),
-                password_data.current_password,
-                password_data.new_password
-            )
-            
-            return {"message": "Password changed successfully"}
-        
-        except AuthenticationException as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Password change failed: {str(e)}"
-            )
-    
-    async def get_current_user_profile(
-        self, 
-        current_user: UserSchema = Depends(get_current_user_required)
-    ) -> UserResponse:
-        """Get current authenticated user profile"""
-        return UserResponse(
-            id=str(current_user.id),
-            email=current_user.email,
-            full_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.username,
-            avatar_url=None,  # Not available in current schema
-            provider="google",  # Default to google for OAuth users
-            is_active=current_user.is_active
+        # Use service role key for admin database operations
+        self.supabase: Client = create_client(
+            settings.supabase_url,
+            settings.supabase_service_key
         )
+        self.jwt_secret = settings.jwt_secret_key
+        self.jwt_algorithm = settings.jwt_algorithm
+        self.token_expire_minutes = settings.access_token_expire_minutes
     
-    async def update_user_location(
-        self, 
-        location_data: UserLocationUpdate,
-        current_user: UserSchema = Depends(get_current_user_required)
-    ) -> dict:
-        """Update user location with automatic geocoding"""
+    # Database operations
+    async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get user by email from database"""
         try:
-            # Convert location data to dict, excluding None values
-            location_dict = {}
-            if location_data.location_address is not None:
-                location_dict["location_address"] = location_data.location_address
-            
-            updated_user = await self.auth_service.update_user_location(str(current_user.id), location_dict)
-            
-            # Determine if geocoding was successful
-            geocoding_success = updated_user.location_geom is not None
-            
-            return {
-                "message": "Location updated successfully" + (" (coordinates found)" if geocoding_success else " (address saved, coordinates not found)"),
-                "user": {
-                    "id": str(updated_user.id),
-                    "email": updated_user.email,
-                    "username": updated_user.username,
-                    "first_name": updated_user.first_name,
-                    "last_name": updated_user.last_name,
-                    "location_address": updated_user.location_address,
-                    "has_coordinates": geocoding_success,
-                    "is_active": updated_user.is_active
-                }
-            }
-        
-        except AuthenticationException as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
+            result = self.supabase.table("users").select("*").eq("email", email).execute()
+            return result.data[0] if result.data else None
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Location update failed: {str(e)}"
-            )
+            raise DatabaseException(f"Error fetching user: {str(e)}")
     
-    async def update_user_name(
-        self, 
-        name_data: UserNameUpdate,
-        current_user: UserSchema = Depends(get_current_user_required)
-    ) -> dict:
-        """Update user name (first_name and last_name) - OAuth users cannot update names"""
+    async def get_user_by_email_with_password(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get user by email from database with hashed_password for authentication"""
         try:
-            # Check if user is OAuth user (Google)
-            if current_user.provider == "google":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="OAuth users cannot update their names. Names are managed by your Google account."
-                )
-            
-            # Convert name data to dict, excluding None values
-            name_dict = {}
-            if name_data.first_name is not None:
-                name_dict["first_name"] = name_data.first_name
-            if name_data.last_name is not None:
-                name_dict["last_name"] = name_data.last_name
-            
-            # Check if at least one field is provided
-            if not name_dict:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="At least one name field (first_name or last_name) must be provided"
-                )
-            
-            updated_user = await self.auth_service.update_user_name(str(current_user.id), name_dict)
-            
-            return {
-                "message": "Name updated successfully",
-                "user": {
-                    "id": str(updated_user.id),
-                    "email": updated_user.email,
-                    "username": updated_user.username,
-                    "first_name": updated_user.first_name,
-                    "last_name": updated_user.last_name,
-                    "provider": updated_user.provider,
-                    "is_active": updated_user.is_active
-                }
-            }
-        
-        except HTTPException:
-            raise
-        except AuthenticationException as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
+            result = self.supabase.table("users").select("*").eq("email", email).execute()
+            return result.data[0] if result.data else None
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Name update failed: {str(e)}"
-            )
+            raise DatabaseException(f"Error fetching user: {str(e)}")
+    
+    async def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        """Get user by username from database"""
+        try:
+            result = self.supabase.table("users").select("*").eq("username", username).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            raise DatabaseException(f"Error fetching user: {str(e)}")
+    
+    async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by ID from database"""
+        try:
+            result = self.supabase.table("users").select("*").eq("id", user_id).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            raise DatabaseException(f"Error fetching user: {str(e)}")
+    
+    async def get_user_by_id_with_password(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by ID from database with hashed_password for password changes"""
+        try:
+            result = self.supabase.table("users").select("*").eq("id", user_id).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            raise DatabaseException(f"Error fetching user: {str(e)}")
+    
+    async def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new user in database"""
+        try:
+            # Generate UUID for user ID if not provided
+            if "id" not in user_data:
+                import uuid
+                user_data["id"] = str(uuid.uuid4())
+            
+            # Add timestamps
+            user_data["created_at"] = datetime.utcnow().isoformat()
+            user_data["updated_at"] = datetime.utcnow().isoformat()
+            
+            result = self.supabase.table("users").insert(user_data).execute()
+            
+            if result.data:
+                return result.data[0]
+            else:
+                raise DatabaseException("Failed to create user - no data returned")
+                
+        except Exception as e:
+            raise DatabaseException(f"Error creating user: {str(e)}")
+    
+    async def update_user(self, user_id: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update existing user in database"""
+        try:
+            # Add updated timestamp
+            user_data["updated_at"] = datetime.utcnow().isoformat()
+            
+            result = self.supabase.table("users").update(user_data).eq("id", user_id).execute()
+            
+            if result.data:
+                return result.data[0]
+            else:
+                raise DatabaseException("Failed to update user")
+                
+        except Exception as e:
+            raise DatabaseException(f"Error updating user: {str(e)}")
+    
+    async def update_user_password(self, user_id: str, hashed_password: str) -> bool:
+        """Update user password"""
+        try:
+            result = self.supabase.table("users").update({
+                "hashed_password": hashed_password,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", user_id).execute()
+            
+            return bool(result.data)
+            
+        except Exception as e:
+            raise DatabaseException(f"Error updating password: {str(e)}")
+    
+    async def update_user_location(self, user_id: str, location_data: dict) -> Dict[str, Any]:
+        """Update user location in database"""
+        try:
+            update_data = {
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Add location fields if provided
+            if "location_address" in location_data:
+                update_data["location_address"] = location_data["location_address"]
+            if "location_geom" in location_data:
+                update_data["location_geom"] = location_data["location_geom"]
+            
+            result = self.supabase.table("users").update(update_data).eq("id", user_id).execute()
+            
+            if result.data:
+                return result.data[0]
+            else:
+                raise DatabaseException("Failed to update user location")
+                
+        except Exception as e:
+            raise DatabaseException(f"Error updating user location: {str(e)}")
+    
+    async def update_user_name(self, user_id: str, name_data: dict) -> Dict[str, Any]:
+        """Update user name in database"""
+        try:
+            update_data = {
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Add name fields if provided
+            if "first_name" in name_data and name_data["first_name"] is not None:
+                update_data["first_name"] = name_data["first_name"].strip()
+            
+            if "last_name" in name_data and name_data["last_name"] is not None:
+                update_data["last_name"] = name_data["last_name"].strip()
+            
+            result = self.supabase.table("users").update(update_data).eq("id", user_id).execute()
+            
+            if result.data:
+                return result.data[0]
+            else:
+                raise DatabaseException("Failed to update user name")
+                
+        except Exception as e:
+            raise DatabaseException(f"Error updating user name: {str(e)}")
+    
+    # JWT operations
+    def create_access_token(self, data: Dict[str, Any]) -> str:
+        """Create JWT access token"""
+        to_encode = data.copy()
+        expire = datetime.utcnow() + timedelta(minutes=self.token_expire_minutes)
+        to_encode.update({"exp": expire})
+        
+        encoded_jwt = jwt.encode(to_encode, self.jwt_secret, algorithm=self.jwt_algorithm)
+        return encoded_jwt
+    
+    def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """Verify and decode JWT token"""
+        try:
+            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+            return payload
+        except JWTError:
+            return None
 
 # Create controller instance
 auth_controller = AuthController()
