@@ -202,9 +202,11 @@ python load_gdb_data.py
 - **Population Data**: CSV files from BPS
 - **Health Facilities**: Geocoded health center data
 
-## 🔧 Quick Start untuk Development
+## 🚀 Quick Start
 
-### 1. Setup Environment
+### Development Setup
+
+#### 1. Setup Environment
 ```bash
 cd Backend
 python -m venv venv
@@ -214,24 +216,24 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 2. Install Dependencies
+#### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Setup Supabase
+#### 3. Setup Supabase
 - Buat project di [Supabase](https://supabase.com)
 - Enable PostGIS extension
 - Dapatkan database credentials dari Settings > Database
 - Copy connection string
 
-### 4. Configure Environment
+#### 4. Configure Environment
 ```bash
 cp env.example .env
 # Edit .env dengan Supabase credentials Anda
 ```
 
-### 5. Load Data
+#### 5. Load Data
 ```bash
 # Load administrative boundaries
 python load_gdb_data.py
@@ -240,15 +242,33 @@ python load_gdb_data.py
 alembic upgrade head
 ```
 
-### 6. Start Development Server
+#### 6. Start Development Server
 ```bash
 python start.py
 ```
 
-### 7. Access Application
+#### 7. Access Application
 - API: http://localhost:8000
 - Health Check: http://localhost:8000/health
 - API Documentation: http://localhost:8000/docs
+
+### Production Deployment
+
+#### Vercel Serverless Deployment
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy to Vercel
+cd Backend
+vercel login
+vercel
+
+# Deploy to production
+vercel --prod
+```
+
+**For detailed deployment instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**
 
 ## 🧪 Testing
 

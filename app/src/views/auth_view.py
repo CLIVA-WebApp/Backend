@@ -10,6 +10,7 @@ from app.src.schemas.auth_schema import (
     UserResponse
 )
 from app.src.utils.exceptions import AuthenticationException
+import logging
 
 # Create router with prefix and tags
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -39,6 +40,11 @@ async def google_callback(
     try:
         user, jwt_token = await auth_service.handle_oauth_callback(code, state)
         
+        logging.info(f"OAuth successful for user: {user.email}")
+        logging.info(f"Frontend URL: {settings.frontend_url}")
+        logging.info(f"Backend URL: {settings.backend_url}")
+        logging.info(f"App environment: {settings.app_env}")
+        
         response = RedirectResponse(url=f"{settings.frontend_url}/auth/success", status_code=302)
 
         # Set HTTP-only cookie with the JWT token
@@ -46,11 +52,13 @@ async def google_callback(
             key="access_token",
             value=jwt_token,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
-            max_age=settings.access_token_expire_minutes * 60
+            secure=settings.app_env == "production",  # True in production with HTTPS
+            samesite="none" if settings.app_env == "production" else "lax",
+            max_age=settings.access_token_expire_minutes * 60,
+            domain=None  # Let browser set the domain automatically
         )
         
+        logging.info("Cookie set successfully")
         return response
     
     except AuthenticationException as e:
@@ -76,9 +84,10 @@ async def register_user(user_data: UserRegister, response: Response):
             key="access_token",
             value=jwt_token,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
-            max_age=settings.access_token_expire_minutes * 60
+            secure=settings.app_env == "production",  # True in production with HTTPS
+            samesite="none" if settings.app_env == "production" else "lax",
+            max_age=settings.access_token_expire_minutes * 60,
+            domain=None  # Let browser set the domain automatically
         )
         
         return {
@@ -116,9 +125,10 @@ async def login_user(login_data: UserLogin, response: Response):
             key="access_token",
             value=jwt_token,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
-            max_age=settings.access_token_expire_minutes * 60
+            secure=settings.app_env == "production",  # True in production with HTTPS
+            samesite="none" if settings.app_env == "production" else "lax",
+            max_age=settings.access_token_expire_minutes * 60,
+            domain=None  # Let browser set the domain automatically
         )
         
         return {
