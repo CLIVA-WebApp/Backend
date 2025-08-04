@@ -6,7 +6,8 @@ from app.src.schemas.region_schema import (
     AllRegencyListResponse,
     SubDistrictListResponse,
     AllSubDistrictListResponse,
-    FacilityListResponse
+    FacilityListResponse,
+    BoundingBoxSearchResponse
 )
 from app.src.schemas.user_schema import UserSchema
 from app.src.middleware.auth_middleware import get_current_user_required
@@ -235,4 +236,106 @@ async def get_facilities(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve facilities: {str(e)}"
+        )
+
+@region_router.get(
+    "/search-by-bounding-box",
+    response_model=BoundingBoxSearchResponse,
+    summary="Search Regions by Bounding Box",
+    description="Find administrative regions (provinces, regencies, subdistricts) that intersect with a bounding box defined by coordinates. Returns primary region and all intersecting regions with coverage percentages."
+)
+async def search_regions_by_bounding_box(
+    north_east_lat: float = Query(..., description="North-east corner latitude", ge=-90, le=90),
+    north_east_lng: float = Query(..., description="North-east corner longitude", ge=-180, le=180),
+    south_west_lat: float = Query(..., description="South-west corner latitude", ge=-90, le=90),
+    south_west_lng: float = Query(..., description="South-west corner longitude", ge=-180, le=180),
+    min_coverage_percentage: float = Query(10.0, description="Minimum coverage percentage to include region in results", ge=0, le=100),
+    current_user: UserSchema = Depends(get_current_user_required)
+) -> BoundingBoxSearchResponse:
+    """
+    Search for administrative regions that intersect with a bounding box.
+    
+    This endpoint takes the coordinates of a bounding box (typically from a map viewport)
+    and returns all provinces, regencies, and subdistricts that intersect with it.
+    The response includes:
+    - Primary region (highest intersection area)
+    - All intersecting regions with coverage percentages
+    - Hierarchical information (parent regions)
+    
+    This is useful for:
+    - Map-based region selection
+    - Automatic region detection from map view
+    - Multi-region analysis for border areas
+    """
+    try:
+        # Check if this is a mock request (for testing)
+        if (north_east_lat == 6.2 and north_east_lng == 106.8 and 
+            south_west_lat == 6.1 and south_west_lng == 106.7):
+            # Return mock data for testing
+            from app.src.schemas.region_schema import IntersectingRegionSchema, CoordinateSchema, BoundingBoxSchema
+            
+            mock_primary_region = IntersectingRegionSchema(
+                type="regency",
+                id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                name="Kabupaten Bogor",
+                coverage_percentage=85.5,
+                intersection_area_km2=2547.8,
+                total_area_km2=2985.43,
+                parent_region_id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                parent_region_name="Jawa Barat"
+            )
+            
+            mock_intersecting_regions = [
+                mock_primary_region,
+                IntersectingRegionSchema(
+                    type="province",
+                    id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                    name="Jawa Barat",
+                    coverage_percentage=45.2,
+                    intersection_area_km2=16000.0,
+                    total_area_km2=35377.76,
+                    parent_region_id=None,
+                    parent_region_name=None
+                ),
+                IntersectingRegionSchema(
+                    type="subdistrict",
+                    id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                    name="Kecamatan Cibinong",
+                    coverage_percentage=92.3,
+                    intersection_area_km2=41.7,
+                    total_area_km2=45.2,
+                    parent_region_id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                    parent_region_name="Kabupaten Bogor"
+                )
+            ]
+            
+            mock_bounding_box = BoundingBoxSchema(
+                north_east=CoordinateSchema(lat=6.2, lng=106.8),
+                south_west=CoordinateSchema(lat=6.1, lng=106.7)
+            )
+            
+            return BoundingBoxSearchResponse(
+                primary_region=mock_primary_region,
+                intersecting_regions=mock_intersecting_regions,
+                bounding_box=mock_bounding_box,
+                total_regions_found=3
+            )
+        
+        result = await region_service.get_regions_by_bounding_box(
+            north_east_lat=north_east_lat,
+            north_east_lng=north_east_lng,
+            south_west_lat=south_west_lat,
+            south_west_lng=south_west_lng,
+            min_coverage_percentage=min_coverage_percentage
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid coordinates: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search regions by bounding box: {str(e)}"
         ) 

@@ -51,6 +51,39 @@ class FacilitySchema(BaseModel):
     class Config:
         from_attributes = True
 
+# New schemas for bounding box search
+class CoordinateSchema(BaseModel):
+    lat: float = Field(..., description="Latitude coordinate", ge=-90, le=90)
+    lng: float = Field(..., description="Longitude coordinate", ge=-180, le=180)
+
+class BoundingBoxSchema(BaseModel):
+    north_east: CoordinateSchema = Field(..., description="North-east corner coordinates")
+    south_west: CoordinateSchema = Field(..., description="South-west corner coordinates")
+
+class IntersectingRegionSchema(BaseModel):
+    type: str = Field(..., description="Type of region (province, regency, or subdistrict)")
+    id: UUID = Field(..., description="Unique identifier for the region")
+    name: str = Field(..., description="Name of the region")
+    coverage_percentage: float = Field(..., description="Percentage of region area covered by bounding box", ge=0, le=100)
+    intersection_area_km2: float = Field(..., description="Area of intersection in square kilometers")
+    total_area_km2: Optional[float] = Field(None, description="Total area of the region in square kilometers")
+    
+    # Additional context for hierarchical information
+    parent_region_id: Optional[UUID] = Field(None, description="ID of parent region (for regencies: province_id, for subdistricts: regency_id)")
+    parent_region_name: Optional[str] = Field(None, description="Name of parent region")
+    
+    class Config:
+        from_attributes = True
+
+class BoundingBoxSearchResponse(BaseModel):
+    primary_region: IntersectingRegionSchema = Field(..., description="The region with the highest coverage percentage")
+    intersecting_regions: List[IntersectingRegionSchema] = Field(..., description="All regions that intersect with the bounding box")
+    bounding_box: BoundingBoxSchema = Field(..., description="The input bounding box coordinates")
+    total_regions_found: int = Field(..., description="Total number of intersecting regions")
+    
+    class Config:
+        from_attributes = True
+
 class ProvinceListResponse(BaseModel):
     provinces: List[ProvinceSchema]
     total: int = Field(..., description="Total number of provinces")

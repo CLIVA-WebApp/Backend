@@ -1,5 +1,5 @@
 from typing import List, Optional
-from app.src.schemas.region_schema import ProvinceSchema, RegencySchema, SubDistrictSchema, FacilitySchema
+from app.src.schemas.region_schema import ProvinceSchema, RegencySchema, SubDistrictSchema, FacilitySchema, IntersectingRegionSchema, BoundingBoxSearchResponse, BoundingBoxSchema, CoordinateSchema
 from app.src.controllers.region_controller import region_controller
 import logging
 from uuid import UUID
@@ -223,4 +223,65 @@ class RegionService:
             
         except Exception as e:
             logger.error(f"Error retrieving facilities for regency {regency_id}: {str(e)}")
+            raise
+
+    async def get_regions_by_bounding_box(
+        self,
+        north_east_lat: float,
+        north_east_lng: float,
+        south_west_lat: float,
+        south_west_lng: float,
+        min_coverage_percentage: float = 10.0
+    ) -> BoundingBoxSearchResponse:
+        """
+        Get administrative regions intersecting with bounding box.
+        Returns primary region and all significant intersecting regions.
+        """
+        try:
+            # Validate coordinates
+            if not (-90 <= north_east_lat <= 90 and -90 <= south_west_lat <= 90):
+                raise ValueError("Latitude must be between -90 and 90 degrees")
+            if not (-180 <= north_east_lng <= 180 and -180 <= south_west_lng <= 180):
+                raise ValueError("Longitude must be between -180 and 180 degrees")
+            if north_east_lat <= south_west_lat:
+                raise ValueError("North-east latitude must be greater than south-west latitude")
+            if north_east_lng <= south_west_lng:
+                raise ValueError("North-east longitude must be greater than south-west longitude")
+            
+            # Get regions data from controller
+            regions_data = await region_controller.get_regions_by_bounding_box(
+                north_east_lat=north_east_lat,
+                north_east_lng=north_east_lng,
+                south_west_lat=south_west_lat,
+                south_west_lng=south_west_lng,
+                min_coverage_percentage=min_coverage_percentage
+            )
+            
+            # Convert to schema objects
+            intersecting_regions = []
+            for region_data in regions_data['intersecting_regions']:
+                intersecting_regions.append(IntersectingRegionSchema(**region_data))
+            
+            # Create primary region schema
+            primary_region = IntersectingRegionSchema(**regions_data['primary_region']) if regions_data['primary_region'] else None
+            
+            # Create bounding box schema
+            bounding_box = BoundingBoxSchema(
+                north_east=CoordinateSchema(lat=north_east_lat, lng=north_east_lng),
+                south_west=CoordinateSchema(lat=south_west_lat, lng=south_west_lng)
+            )
+            
+            # Create response
+            response = BoundingBoxSearchResponse(
+                primary_region=primary_region,
+                intersecting_regions=intersecting_regions,
+                bounding_box=bounding_box,
+                total_regions_found=regions_data['total_regions_found']
+            )
+            
+            logger.info(f"Retrieved {len(intersecting_regions)} regions for bounding box")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error retrieving regions by bounding box: {str(e)}")
             raise 
